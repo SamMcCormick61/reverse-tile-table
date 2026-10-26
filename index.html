@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Reverse Tile Table</title>
+<meta name="description" content="A finished crossword tile game with every tile face down. Work out where your letters went.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='5' fill='%23b88a52'/%3E%3Ctext x='15' y='23' font-family='sans-serif' font-weight='700' font-size='19' text-anchor='middle' fill='%232b1c10'%3E%3F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Jost:wght@500;600&display=swap">
+<style>
+/* Same walnut games table as Tile Table; the board is a finished game with every tile turned face down. */
+:root {
+  --table: #2a1a12; --table-glow: #4a2e1e; --grain: rgba(255,240,220,.025); --grain-dark: rgba(0,0,0,.06);
+  --ink: #f3e9d8; --muted: #bba98f; --line: #4d3628; --panel: #33221a; --panel-2: #3f2b20;
+  --frame: #163a35; --frame-edge: #0f2a26; --cell: #c9ccb0; --cell-ink: #5d6450;
+  --tw: #c4473a; --dw: #e6a6a2; --tl: #2f5d9e; --dl: #98c7de;
+  --tw-ink: #fff3ee; --dw-ink: #6a2b28; --tl-ink: #eaf1ff; --dl-ink: #1d4257;
+  --tile-1: #f7e9c8; --tile-2: #e2c690; --tile-ink: #2b1c10; --tile-edge: #a9844d; --blank-ink: #a4581c;
+  --back-1: #9a6b3e; --back-2: #6e4627; --back-edge: #4a2d17; --back-ink: rgba(255,236,205,.55);
+  --ledge-1: #6a4429; --ledge-2: #3e2717;
+  --accent: #f2b84b; --accent-ink: #2b1c10; --good: #7bd69a; --bad: #ff8f7d;
+  --seat-0: #f2b84b; --seat-1: #5cc8b5; --seat-2: #f08a6c; --seat-3: #b3a5f5;
+  --shadow: rgba(0,0,0,.45); --scrim: rgba(20,12,8,.72);
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --f-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --f-tile: "Jost", "Futura", "Century Gothic", "Avenir Next", sans-serif;
+  color-scheme: dark;
+}
+html, body { min-height: 100%; }
+body { margin: 0; }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background-color: var(--table);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, var(--table-glow), transparent 70%),
+    repeating-linear-gradient(91deg, var(--grain) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(89deg, var(--grain-dark) 0 1px, transparent 1px 14px);
+  background-attachment: fixed;
+  color: var(--ink); font: 15px/1.5 var(--f-body);
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 14px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.mark { display: flex; align-items: center; gap: 10px; color: var(--ink); background: none; border: 0; padding: 0; }
+.mark .minis { display: flex; gap: 3px; }
+.mini { width: 26px; height: 26px; border-radius: 4px; background: linear-gradient(150deg, var(--tile-1), var(--tile-2));
+  box-shadow: inset 0 -2px 0 var(--tile-edge), 0 2px 3px var(--shadow); color: var(--tile-ink);
+  font: 600 16px/26px var(--f-tile); text-align: center; position: relative; }
+.mini.down { background: linear-gradient(150deg, var(--back-1), var(--back-2)); box-shadow: inset 0 -2px 0 var(--back-edge), 0 2px 3px var(--shadow); color: var(--back-ink); }
+.mini i { position: absolute; right: 2px; bottom: -3px; font: 600 7px var(--f-tile); font-style: normal; }
+.mark span.word { font: 800 24px/1 var(--f-display); letter-spacing: -.01em; }
+.who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--ink); }
+.chip code { font: 600 13px var(--f-tile); letter-spacing: .14em; }
+
+/* Generic */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 16px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-weight: 600; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.07); }
+.btn.warn { border-color: var(--bad); color: var(--bad); }
+.btn.small { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .lbl { font-size: 13px; color: var(--muted); font-weight: 500; }
+.input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--table); color: var(--ink); width: 100%; }
+.input.code { font: 600 18px var(--f-tile); letter-spacing: .2em; text-transform: uppercase; }
+.muted { color: var(--muted); }
+.small-note { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* Setup */
+.hero { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 22px; }
+.hero h1 { font-size: clamp(30px, 6vw, 52px); font-weight: 800; letter-spacing: -.02em; line-height: 1.02; }
+.hero p { margin: 0; color: var(--muted); max-width: 64ch; }
+.lobby { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 18px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.row > .field { flex: 1 1 160px; min-width: 0; }
+.opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.pl { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+.check span small { display: block; color: var(--muted); font-size: 12.5px; }
+.rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.rules b { color: var(--accent); font-weight: 600; }
+
+/* Loading */
+.loading { max-width: 460px; margin: 40px auto; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.deal { display: flex; gap: 6px; }
+.deal .mini { width: 40px; height: 40px; font-size: 24px; line-height: 40px; border-radius: 7px; }
+@media (prefers-reduced-motion: no-preference) {
+  .deal .mini { animation: flip 1.6s ease-in-out infinite; }
+  .deal .mini:nth-child(2) { animation-delay: .15s; } .deal .mini:nth-child(3) { animation-delay: .3s; }
+  .deal .mini:nth-child(4) { animation-delay: .45s; } .deal .mini:nth-child(5) { animation-delay: .6s; }
+}
+@keyframes flip { 0%, 60%, 100% { transform: none; } 30% { transform: rotateY(90deg); } }
+
+/* Game */
+.game { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
+@media (max-width: 940px) { .game { grid-template-columns: minmax(0, 1fr); } }
+.play-col { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.turnline { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 34px; font-weight: 600; text-align: center; flex-wrap: wrap; }
+.turnline .pill { padding: 5px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-family: var(--f-display); font-weight: 800; letter-spacing: .02em; }
+.shot { font: 700 15px var(--f-tile); font-variant-numeric: tabular-nums; letter-spacing: .03em; padding: 4px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+.shot.low { color: var(--bad); border-color: var(--bad); }
+
+.board-wrap { width: 100%; max-width: min(720px, max(340px, calc(100dvh - 320px))); container-type: inline-size; }
+.board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: .4cqw; padding: 1.8cqw; border-radius: 2cqw;
+  background: linear-gradient(160deg, var(--frame), var(--frame-edge)); box-shadow: 0 2.2cqw 4cqw var(--shadow), inset 0 0 0 .3cqw rgba(255,255,255,.06); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.cell { aspect-ratio: 1; border-radius: .6cqw; background: var(--cell); position: relative; display: grid; place-items: center;
+  font: 700 1.7cqw/1 var(--f-body); letter-spacing: .04em; color: var(--cell-ink); box-shadow: inset 0 .25cqw .4cqw rgba(0,0,0,.18); }
+.cell.TW { background: var(--tw); color: var(--tw-ink); }
+.cell.DW { background: var(--dw); color: var(--dw-ink); }
+.cell.TL { background: var(--tl); color: var(--tl-ink); }
+.cell.DL { background: var(--dl); color: var(--dl-ink); }
+.cell.void { opacity: .38; }
+.cell.star { font-size: 3.6cqw; }
+.cell.hover { outline: .4cqw solid var(--accent); outline-offset: -.2cqw; }
+.cell.target { cursor: pointer; }
+.cell.target:hover { filter: brightness(1.12); }
+
+.tile { position: absolute; inset: 4%; border-radius: 14%; display: grid; place-items: center;
+  background: linear-gradient(150deg, var(--tile-1) 10%, var(--tile-2));
+  box-shadow: inset 0 -.45cqw 0 var(--tile-edge), inset 0 .2cqw 0 rgba(255,255,255,.55), 0 .35cqw .55cqw var(--shadow);
+  color: var(--tile-ink); font: 600 3.8cqw/1 var(--f-tile); }
+.tile b { font-weight: 600; transform: translateY(-4%); }
+.tile i { position: absolute; right: 9%; bottom: 7%; font: 600 1.5cqw/1 var(--f-tile); font-style: normal; }
+.tile.blank b { color: var(--blank-ink); }
+.tile.clue { background: linear-gradient(150deg, #efe2c4 10%, #d6c091); }
+.tile.clue::after { content: ""; position: absolute; left: 10%; top: 10%; width: 1cqw; height: 1cqw; border-radius: 50%; background: var(--seat-1); }
+.tile.down { background: repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 .5cqw, transparent .5cqw 1.2cqw), linear-gradient(150deg, var(--back-1) 10%, var(--back-2));
+  box-shadow: inset 0 -.45cqw 0 var(--back-edge), inset 0 .2cqw 0 rgba(255,255,255,.18), 0 .35cqw .55cqw var(--shadow); color: var(--back-ink); }
+.tile.down .pm { position: absolute; left: 8%; top: 8%; padding: .2cqw .45cqw; border-radius: .5cqw; font: 700 1.25cqw/1 var(--f-body); letter-spacing: .02em; }
+.pm.TW { background: var(--tw); color: var(--tw-ink); } .pm.DW { background: var(--dw); color: var(--dw-ink); }
+.pm.TL { background: var(--tl); color: var(--tl-ink); } .pm.DL { background: var(--dl); color: var(--dl-ink); }
+.tile.down .nots { position: absolute; left: 6%; right: 6%; bottom: 6%; font: 600 1.35cqw/1.1 var(--f-tile); color: #ffd2c8; text-decoration: line-through; text-align: center; overflow-wrap: anywhere; }
+.tile.pending { box-shadow: inset 0 -.45cqw 0 var(--tile-edge), 0 0 0 .45cqw var(--accent), 0 .8cqw 1.2cqw var(--shadow); transform: translateY(-4%); cursor: grab; touch-action: none; }
+.tile.right { box-shadow: inset 0 -.45cqw 0 var(--tile-edge), 0 0 0 .45cqw var(--good), 0 .35cqw .55cqw var(--shadow); }
+.tile.wrong { background: linear-gradient(150deg, #ffd8cf, #f2a797); box-shadow: inset 0 -.45cqw 0 #b55a48, 0 0 0 .45cqw var(--bad); }
+.tile.wrong b { text-decoration: line-through; }
+.tile.unfound { opacity: .55; filter: saturate(.4); }
+.tile.peek { box-shadow: inset 0 -.45cqw 0 var(--tile-edge), 0 0 0 .45cqw var(--seat-3), 0 .35cqw .55cqw var(--shadow); }
+@media (prefers-reduced-motion: no-preference) {
+  .tile.fresh { animation: turn .45s ease-out; }
+  .tile.wrong { animation: shake .4s ease-in-out; }
+}
+@keyframes turn { from { transform: rotateY(90deg); } }
+@keyframes shake { 25% { transform: translateX(-6%); } 75% { transform: translateX(6%); } }
+
+/* Rack */
+.rack-area { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 10px; }
+.ledge { --s: clamp(36px, calc((100vw - 92px) / 7), 58px);
+  display: flex; justify-content: center; align-items: center; gap: 6px; min-height: calc(var(--s) + 22px); padding: 10px;
+  border-radius: 14px; background: linear-gradient(180deg, var(--ledge-1), var(--ledge-2)); box-shadow: inset 0 2px 0 rgba(255,255,255,.12), 0 8px 18px var(--shadow); touch-action: none; }
+.rtile { width: var(--s); height: var(--s); position: relative; display: grid; place-items: center; border-radius: 12%; border: 0; padding: 0;
+  background: linear-gradient(150deg, var(--tile-1) 10%, var(--tile-2)); color: var(--tile-ink);
+  box-shadow: inset 0 -4px 0 var(--tile-edge), inset 0 2px 0 rgba(255,255,255,.55), 0 4px 6px var(--shadow);
+  font: 600 calc(var(--s) * .56)/1 var(--f-tile); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; transition: transform .12s; }
+.rtile i { position: absolute; right: 9%; bottom: 6%; font: 600 calc(var(--s) * .2)/1 var(--f-tile); font-style: normal; }
+.rtile.sel { transform: translateY(-8px); box-shadow: inset 0 -4px 0 var(--tile-edge), 0 0 0 3px var(--accent), 0 10px 12px var(--shadow); }
+.rtile.swap { transform: translateY(-8px); box-shadow: inset 0 -4px 0 var(--tile-edge), 0 0 0 3px var(--seat-1), 0 10px 12px var(--shadow); }
+.rtile.dragging { opacity: .25; }
+.rack-empty { color: var(--muted); font-size: 14px; }
+.ghost { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; --s: 58px; transform: translate(-50%, -60%) scale(1.08) rotate(-3deg); filter: drop-shadow(0 10px 14px var(--shadow)); }
+.preview { min-height: 30px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; font-size: 14px; text-align: center; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.actions .btn.primary { min-width: 120px; }
+
+/* Side panel */
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.scores { display: flex; flex-direction: column; gap: 8px; }
+.score { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid transparent; }
+.score.now { border-color: var(--accent); }
+.score .nm { min-width: 0; display: flex; flex-direction: column; }
+.score .nm strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score .nm span { font-size: 12px; color: var(--muted); }
+.score .pts { font: 800 24px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.bagline { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--muted); }
+.bagline strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.bagline strong.low { color: var(--bad); }
+.meter { height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--good); border-radius: inherit; transition: width .4s; }
+.tracker { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.tracker span { display: flex; justify-content: space-between; padding: 2px 6px; border-radius: 6px; background: var(--panel-2); font: 600 13px var(--f-tile); }
+.tracker span em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tracker span.gone { opacity: .3; }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; font-size: 14px; }
+.log li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+.log li .dot { width: 8px; height: 8px; transform: translateY(-1px); }
+.log li .what { min-width: 0; overflow-wrap: anywhere; }
+.log li .what b { font-family: var(--f-tile); font-weight: 600; letter-spacing: .05em; }
+.log li .n { font-variant-numeric: tabular-nums; font-weight: 700; }
+.log li .n.neg { color: var(--bad); }
+.legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; font-size: 12px; color: var(--muted); }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+
+/* Overlays */
+.overlay { position: fixed; inset: 0; z-index: 70; background: var(--scrim); display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(100%, 460px); display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px var(--shadow); }
+.dialog h3 { font-size: 22px; }
+.dialog.wide { width: min(100%, 620px); }
+.breakdown { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.breakdown li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border-radius: 10px; background: var(--panel-2); font-size: 14px; }
+.breakdown li b { font-family: var(--f-tile); font-weight: 600; letter-spacing: .05em; }
+.breakdown li .n { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.breakdown li.good .n { color: var(--good); } .breakdown li.bad .n { color: var(--bad); }
+.breakdown li.total { background: transparent; border-top: 1px solid var(--line); border-radius: 0; font-size: 16px; }
+.breakdown li.total .n { font: 800 24px/1 var(--f-display); color: var(--ink); }
+.final { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.final li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; background: var(--panel-2); border-radius: 10px; }
+.final li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.final li .pts { font: 800 22px var(--f-display); font-variant-numeric: tabular-nums; }
+.final li .adj { font-size: 12px; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 80;
+  background: var(--ink); color: var(--table); padding: 10px 16px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px var(--shadow); max-width: calc(100vw - 32px); text-align: center; }
+.foot { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; }
+.ver { font: 600 11px var(--f-body); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; letter-spacing: .04em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <button class="mark" id="homeBtn" type="button" aria-label="Reverse Tile Table home">
+      <span class="minis" aria-hidden="true"><span class="mini">R<i>1</i></span><span class="mini down">?</span><span class="mini">V<i>4</i></span><span class="mini down">?</span></span>
+      <span class="word">Reverse</span>
+      <span class="ver" id="verTag"></span>
+    </button>
+    <div class="who" id="whoBar"></div>
+  </header>
+
+  <!-- Setup -->
+  <section id="setupView">
+    <div class="hero">
+      <h1>The game's over. Now find the letters.</h1>
+      <p>A full game has already been played to the last tile, then every tile was turned face down. You draw seven letters from the same bag and put each one back where you think it was played.</p>
+    </div>
+    <div class="lobby">
+      <div class="card stack">
+        <h2>Players</h2>
+        <div class="stack" id="playerList" style="gap:8px"></div>
+        <button class="btn small" id="addPlayer" type="button" style="align-self:flex-start">Add a player</button>
+        <p class="small-note">Play solo, or pass one device around for up to four players.</p>
+      </div>
+      <div class="card stack">
+        <h2>Board</h2>
+        <div class="opts" role="group" aria-label="Board">
+          <button class="btn small" type="button" data-board="new" aria-pressed="true">Fresh deal</button>
+          <button class="btn small" type="button" data-board="daily" aria-pressed="false">Today's board</button>
+          <button class="btn small" type="button" data-board="code" aria-pressed="false">Use a code</button>
+        </div>
+        <div class="field" id="codeField" hidden>
+          <label for="codeIn">Board code</label>
+          <input class="input code" id="codeIn" maxlength="8" placeholder="E123456" autocomplete="off">
+        </div>
+        <span class="lbl">Words on the board</span>
+        <div class="opts" role="group" aria-label="Words">
+          <button class="btn small" type="button" data-words="E" aria-pressed="true">Everyday words</button>
+          <button class="btn small" type="button" data-words="T" aria-pressed="false">Tournament list</button>
+        </div>
+        <p class="small-note" id="boardNote">A brand-new finished game is played out for you.</p>
+      </div>
+      <div class="card stack">
+        <h2>Clocks</h2>
+        <span class="lbl">Turn timer (each player, every turn)</span>
+        <div class="opts" role="group" aria-label="Turn timer" id="turnOpts"></div>
+        <span class="lbl">Game clock (whole game)</span>
+        <div class="opts" role="group" aria-label="Game clock" id="gameOpts"></div>
+        <p class="small-note">Run out of turn time and your tiles go back on your rack and play moves on. When the game clock hits zero the game ends and unplayed tiles count against you.</p>
+      </div>
+      <div class="card stack">
+        <h2>Helpers</h2>
+        <label class="check"><input type="checkbox" id="optOpener" checked><span>Show the opening word<small>The first word of the finished game starts face up.</small></span></label>
+        <label class="check"><input type="checkbox" id="optNotes" checked><span>Mark wrong guesses<small>Letters already tried on a square are crossed out on it.</small></span></label>
+        <label class="check"><input type="checkbox" id="optPeek" checked><span>Allow peeks<small>Once a turn, pay 10 points to flip any tile face up.</small></span></label>
+        <label class="check"><input type="checkbox" id="optStreak" checked><span>Hot streaks<small>Bonus for back-to-back turns with no wrong tiles.</small></span></label>
+      </div>
+      <div class="card stack" style="grid-column: 1 / -1">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h2>How scoring works</h2>
+          <div class="row">
+            <button class="btn" id="resumeBtn" type="button" hidden>Continue last game</button>
+            <button class="btn primary" id="startBtn" type="button">Deal the board</button>
+          </div>
+        </div>
+        <ol class="rules" id="rulesList"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- Loading -->
+  <section id="loadingView" hidden>
+    <div class="loading">
+      <div class="deal" aria-hidden="true"><span class="mini down">?</span><span class="mini down">?</span><span class="mini down">?</span><span class="mini down">?</span><span class="mini down">?</span></div>
+      <h1 style="font-size:28px">Playing out a full game…</h1>
+      <p class="muted" id="loadingMsg" style="margin:0">Two computer players are using every one of the 100 tiles. This takes a few seconds.</p>
+    </div>
+  </section>
+
+  <!-- Game -->
+  <section id="gameView" hidden>
+    <div class="game">
+      <div class="play-col">
+        <div class="turnline" id="turnline"></div>
+        <div class="board-wrap"><div class="board" id="board"></div></div>
+        <div class="rack-area" id="rackArea">
+          <div class="ledge" id="rack"></div>
+          <div class="preview" id="preview"></div>
+          <div class="actions" id="actions"></div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="card stack" style="gap:10px">
+          <h2>Scores</h2>
+          <div class="scores" id="scores"></div>
+        </div>
+        <div class="card stack" style="gap:10px">
+          <div class="bagline"><span>Tiles found</span><strong id="foundN"></strong></div>
+          <div class="meter"><i id="foundBar"></i></div>
+          <div class="bagline"><span>In the bag</span><strong id="bagN"></strong></div>
+          <div class="bagline" id="gameClockLine"><span>Game clock</span><strong id="gameClock"></strong></div>
+          <div class="bagline"><span>Board code</span><strong id="codeTag" style="font-family:var(--f-tile);letter-spacing:.1em"></strong></div>
+        </div>
+        <div class="card stack" style="gap:10px">
+          <h2>Still face down</h2>
+          <div class="tracker" id="tracker"></div>
+          <p class="small-note">Letters hidden on the board that aren't on your rack.</p>
+        </div>
+        <div class="card stack" style="gap:10px">
+          <h2>Turns</h2>
+          <ul class="log" id="log"></ul>
+        </div>
+        <div class="card">
+          <div class="legend">
+            <span><i style="background:var(--tw)"></i>Triple word</span>
+            <span><i style="background:var(--dw)"></i>Double word</span>
+            <span><i style="background:var(--tl)"></i>Triple letter</span>
+            <span><i style="background:var(--dl)"></i>Double letter</span>
+          </div>
+        </div>
+        <button class="btn warn small" id="quitBtn" type="button">End game</button>
+      </aside>
+    </div>
+  </section>
+
+  <p class="foot">Board made by a computer playing a full game with the word list. Not affiliated with any board game publisher.</p>
+</div>
+
+<!-- Pass the device -->
+<div class="overlay" id="passDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="passTitle">
+    <h3 id="passTitle"></h3>
+    <p class="muted" id="passMsg" style="margin:0"></p>
+    <button class="btn primary" id="readyBtn" type="button"></button>
+  </div>
+</div>
+<!-- Turn result -->
+<div class="overlay" id="resultDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <h3 id="resultTitle"></h3>
+    <ul class="breakdown" id="resultList"></ul>
+    <button class="btn primary" id="resultOk" type="button">Continue</button>
+  </div>
+</div>
+<!-- Game over -->
+<div class="overlay" id="endDlg" hidden>
+  <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <h3 id="endTitle"></h3>
+    <p class="muted" id="endMsg" style="margin:0"></p>
+    <ul class="final" id="finalList"></ul>
+    <div class="actions">
+      <button class="btn" id="seeBoard" type="button">See the full board</button>
+      <button class="btn" id="replayBtn" type="button">Same board again</button>
+      <button class="btn primary" id="newBtn" type="button">New game</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="gen.js"></script>
+<script>
+// Bump APP_VERSION and version.txt together on every release.
+const APP_VERSION = '1';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+$('#verTag').textContent = 'v' + APP_VERSION;
+
+// ---------- Rules data ----------
+const VALUES = RSGen.VALUES;
+const N = 15, CENTER = 112, RACK = 7;
+const PREM = new Array(225).fill('');
+function mark(type, base) {
+  for (const [r, c] of base) for (const [a, b] of [[r, c], [c, r]])
+    for (const rr of [a, 14 - a]) for (const cc of [b, 14 - b]) PREM[rr * N + cc] = type;
+}
+mark('TW', [[0,0],[0,7]]);
+mark('DW', [[1,1],[2,2],[3,3],[4,4],[7,7]]);
+mark('TL', [[1,5],[5,5]]);
+mark('DL', [[0,3],[2,6],[3,7],[6,6]]);
+const SEATS = ['var(--seat-0)','var(--seat-1)','var(--seat-2)','var(--seat-3)'];
+const BINGO = 50, PEEK_COST = 10, STREAK_STEP = 10;
+const TURN_OPTS = [[0, 'Off'], [30, '30 s'], [60, '1 min'], [90, '90 s'], [120, '2 min']];
+const GAME_OPTS = [[0, 'Off'], [10, '10 min'], [20, '20 min'], [30, '30 min'], [45, '45 min']];
+const letterMult = i => PREM[i] === 'DL' ? 2 : PREM[i] === 'TL' ? 3 : 1;
+const wordMult = i => PREM[i] === 'DW' ? 2 : PREM[i] === 'TW' ? 3 : 1;
+
+function rand(n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const fmt = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+const RULES = [
+  `Every square with a tile on it is a <b>face-down tile</b>. You can see the shape of the finished game and the bonus squares, but not the letters.`,
+  `Each turn, put any number of your seven tiles on face-down squares, anywhere on the board. Press <b>Check</b> to flip them.`,
+  `A <b>correct</b> tile stays face up and scores its letter value, doubled or tripled on a letter bonus square. Your letter points are then <b>multiplied by how many tiles you got right</b> that turn.`,
+  `A <b>wrong</b> tile costs its letter value (at least 1) and goes back in the bag.`,
+  `Turn the last face-down tile of a word and you also score the <b>whole word</b>, with double and triple word squares you covered that turn.`,
+  `All seven right in one turn is a <b>bingo</b>: +${BINGO}. With hot streaks on, each perfect turn after another earns +${STREAK_STEP}, +${STREAK_STEP * 2}, and so on.`,
+  `Tiles played as blanks in the finished game start face up as free clues.`,
+  `The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on your rack then count against you.`,
+];
+$('#rulesList').innerHTML = RULES.map(r => `<li>${r}</li>`).join('');
+
+// ---------- Setup ----------
+const prefs = Object.assign({ players: ['Player 1'], board: 'new', words: 'E', turnSec: 60, gameMin: 0, opener: true, notes: true, peek: true, streak: true }, store.get('rtt-prefs') || {});
+function savePrefs() { store.set('rtt-prefs', prefs); }
+function renderSetup() {
+  $('#playerList').innerHTML = prefs.players.map((n, k) => `
+    <div class="pl"><span class="dot" style="background:${SEATS[k]}"></span>
+      <input class="input" data-pl="${k}" maxlength="16" value="${esc(n)}" aria-label="Player ${k + 1} name">
+      ${prefs.players.length > 1 ? `<button class="btn small" type="button" data-rm="${k}" aria-label="Remove player ${k + 1}">✕</button>` : '<span></span>'}
+    </div>`).join('');
+  $('#addPlayer').hidden = prefs.players.length >= 4;
+  document.querySelectorAll('[data-board]').forEach(b => b.setAttribute('aria-pressed', b.dataset.board === prefs.board));
+  document.querySelectorAll('[data-words]').forEach(b => b.setAttribute('aria-pressed', b.dataset.words === prefs.words));
+  $('#codeField').hidden = prefs.board !== 'code';
+  $('#turnOpts').innerHTML = TURN_OPTS.map(([v, l]) => `<button class="btn small" type="button" data-turn="${v}" aria-pressed="${v === prefs.turnSec}">${l}</button>`).join('');
+  $('#gameOpts').innerHTML = GAME_OPTS.map(([v, l]) => `<button class="btn small" type="button" data-game="${v}" aria-pressed="${v === prefs.gameMin}">${l}</button>`).join('');
+  $('#optOpener').checked = prefs.opener; $('#optNotes').checked = prefs.notes; $('#optPeek').checked = prefs.peek; $('#optStreak').checked = prefs.streak;
+  $('#boardNote').textContent = prefs.board === 'daily' ? `Everyone who picks today's board gets the same finished game (code ${dailyCode()}). Compare scores with friends.`
+    : prefs.board === 'code' ? 'Type the code from a game a friend played to get the exact same board.'
+    : 'A brand-new finished game is played out for you.';
+  const saved = store.get('rtt-game');
+  $('#resumeBtn').hidden = !(saved && !saved.over && saved.sol);
+}
+function dailyCode() { const d = new Date(); return prefs.words + String((d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()) % 1000000).padStart(6, '0'); }
+$('#setupView').addEventListener('input', e => { const k = e.target.dataset.pl; if (k != null) { prefs.players[+k] = e.target.value; savePrefs(); } });
+$('#setupView').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.rm != null) prefs.players.splice(+t.dataset.rm, 1);
+  else if (t.id === 'addPlayer') prefs.players.push('Player ' + (prefs.players.length + 1));
+  else if (t.dataset.board) prefs.board = t.dataset.board;
+  else if (t.dataset.words) prefs.words = t.dataset.words;
+  else if (t.dataset.turn != null) prefs.turnSec = +t.dataset.turn;
+  else if (t.dataset.game != null) prefs.gameMin = +t.dataset.game;
+  else return;
+  savePrefs(); renderSetup();
+});
+for (const [id, key] of [['#optOpener', 'opener'], ['#optNotes', 'notes'], ['#optPeek', 'peek'], ['#optStreak', 'streak']])
+  $(id).addEventListener('change', e => { prefs[key] = e.target.checked; savePrefs(); });
+
+function parseCode(s) {
+  const m = /^([ET])(\d{1,7})$/.exec(String(s || '').trim().toUpperCase());
+  return m ? { mode: m[1], seed: +m[2] } : null;
+}
+
+// ---------- Board generation ----------
+let worker = null;
+function makeBoard(mode, seed) {
+  return new Promise((resolve, reject) => {
+    const viaMain = async () => {
+      try {
+        const get = n => fetch(n).then(r => { if (!r.ok) throw new Error('Could not load ' + n); return r.text(); }).then(t => t.split(/\s+/).filter(Boolean));
+        const twl = RSGen.buildDict(await get('words.txt'), 8);
+        const d = mode === 'T' ? { main: twl } : { main: RSGen.buildDict(await get('common.txt'), 8), fallback: twl };
+        await new Promise(r => setTimeout(r, 30));
+        resolve(RSGen.generateFull({ ...d, seed, tries: 8 }));
+      } catch (err) { reject(err); }
+    };
+    try { worker = worker || new Worker('gen-worker.js'); } catch { worker = null; }
+    if (!worker) return viaMain();
+    worker.onmessage = e => e.data.ok ? resolve(e.data) : reject(new Error(e.data.error));
+    worker.onerror = () => { worker = null; viaMain(); };
+    worker.postMessage({ mode, seed });
+  });
+}
+
+// ---------- Game state ----------
+// G is the whole game and is saved after every change, so a reload picks up where you left off.
+let G = null;
+const S = { selected: null, pend: new Map(), swapMode: false, swapSel: new Set(), peekMode: false, flash: new Map(), fresh: new Set(), showAll: false };
+const save = () => G && store.set('rtt-game', G);
+const cur = () => G.players[G.cur];
+const allRuns = sol => { // every word on the finished board: maximal runs of 2+ tiles across and down
+  const runs = [];
+  for (const d of [0, 1]) for (let a = 0; a < N; a++) {
+    let run = [];
+    for (let b = 0; b <= N; b++) {
+      const i = d ? b * N + a : a * N + b;
+      if (b < N && sol[i]) run.push(i); else { if (run.length > 1) runs.push(run); run = []; }
+    }
+  }
+  return runs;
+};
+const runText = run => run.map(i => G.sol[i].ch).join('');
+
+async function startGame(code, again) {
+  const p = parseCode(code);
+  if (!p) { toast('That board code doesn\'t look right. It\'s a letter then numbers, like E123456.'); return; }
+  show('loading');
+  let gen;
+  try { gen = await makeBoard(p.mode, p.seed); }
+  catch (err) { show('setup'); toast('Couldn\'t build the board: ' + err.message); return; }
+  const sol = gen.board.map(x => x ? { ch: x.ch, blank: !!x.blank, turn: x.turn } : null);
+  const names = prefs.players.map((n, k) => (n || '').trim() || 'Player ' + (k + 1));
+  G = {
+    v: APP_VERSION, code: p.mode + p.seed, sol, rev: new Array(225).fill(0), notes: {}, bag: [],
+    players: names.map(name => ({ name, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0 })),
+    cur: 0, turn: 1, passes: 0, log: [], over: false, endReason: '',
+    opts: { turnSec: prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
+    gameLeft: prefs.gameMin * 60, turnLeft: prefs.turnSec, phase: 'pass', peekedThisTurn: false, firstWord: gen.words[0]?.cells || [],
+  };
+  // Blank tiles from the finished game are free clues; so is the opening word if that helper is on.
+  for (let i = 0; i < 225; i++) if (sol[i]?.blank) G.rev[i] = 2;
+  if (G.opts.opener) for (const i of G.firstWord) G.rev[i] = G.rev[i] || 2;
+  for (let i = 0; i < 225; i++) if (sol[i] && !G.rev[i]) G.bag.push(sol[i].ch);
+  shuffle(G.bag);
+  for (const pl of G.players) refill(pl);
+  G.log.push({ who: -1, text: `Board <b>${esc(G.code)}</b> dealt: ${gen.words.length} words, ${gen.placed} tiles.` });
+  resetTurnUI();
+  save(); show('game');
+  beginTurnPrompt();
+}
+
+let nextTileId = 1;
+function refill(pl) { while (pl.rack.length < RACK && G.bag.length) pl.rack.push({ id: 't' + Date.now().toString(36) + (nextTileId++), ch: G.bag.pop() }); }
+function hiddenCount() { let n = 0; for (let i = 0; i < 225; i++) if (G.sol[i] && !G.rev[i]) n++; return n; }
+function totalTiles() { return G.sol.filter(Boolean).length; }
+
+function resetTurnUI() { S.selected = null; S.pend = new Map(); S.swapMode = false; S.swapSel = new Set(); S.peekMode = false; }
+
+function beginTurnPrompt() {
+  resetTurnUI();
+  G.turnLeft = G.opts.turnSec; G.peekedThisTurn = false;
+  if (G.players.length === 1) { G.phase = 'turn'; save(); render(); return; }
+  G.phase = 'pass'; save(); render();
+  const p = cur();
+  $('#passTitle').textContent = `Pass to ${p.name}`;
+  $('#passMsg').textContent = G.opts.turnSec ? `Your ${fmt(G.opts.turnSec)} turn timer starts when you tap the button.` : 'Keep your rack hidden from the other players.';
+  $('#readyBtn').textContent = `I'm ${p.name}, show my tiles`;
+  $('#passDlg').hidden = false; $('#readyBtn').focus();
+}
+$('#readyBtn').addEventListener('click', () => { $('#passDlg').hidden = true; G.phase = 'turn'; save(); render(); });
+
+// ---------- Playing a turn ----------
+function placeTile(id, cell, fromCell) {
+  if (G.phase !== 'turn') return;
+  if (!G.sol[cell] || G.rev[cell]) return;
+  const tile = cur().rack.find(t => t.id === id); if (!tile) return;
+  const prev = S.pend.get(cell);
+  if (fromCell != null) S.pend.delete(fromCell);
+  for (const [k, v] of S.pend) if (v.id === id) S.pend.delete(k);
+  S.pend.set(cell, { id, ch: tile.ch });
+  if (prev && fromCell != null && prev.id !== id) S.pend.set(fromCell, prev);
+  S.selected = null; render();
+}
+
+function checkMove() {
+  if (G.phase !== 'turn' || !S.pend.size) return;
+  const p = cur(), right = [], wrong = [];
+  for (const [i, t] of S.pend) (G.sol[i].ch === t.ch ? right : wrong).push({ i, ch: t.ch, id: t.id });
+  const lines = [];
+  // Correct tiles: letter value with letter bonuses, then multiplied by how many were right.
+  let letters = 0;
+  for (const r of right) { letters += VALUES[r.ch] * letterMult(r.i); G.rev[r.i] = 1; }
+  const base = letters * right.length;
+  if (right.length) lines.push({ cls: 'good', l: `${right.length} right: <b>${right.map(r => r.ch).join(' ')}</b> · ${letters} × ${right.length}`, n: base });
+  // Wrong tiles cost their value and go back into the bag.
+  let pen = 0;
+  for (const w of wrong) {
+    pen += Math.max(1, VALUES[w.ch]);
+    if (G.opts.notes) { const s = new Set(G.notes[w.i] || ''); s.add(w.ch); G.notes[w.i] = [...s].sort().join(''); }
+  }
+  if (wrong.length) lines.push({ cls: 'bad', l: `${wrong.length} wrong: <b>${wrong.map(w => w.ch).join(' ')}</b>`, n: -pen });
+  // Words finished this turn score in full, with the word bonuses this turn's tiles covered.
+  const rightSet = new Set(right.map(r => r.i));
+  let wordPts = 0; const done = [];
+  for (const run of allRuns(G.sol)) {
+    if (!run.some(i => rightSet.has(i)) || !run.every(i => G.rev[i])) continue;
+    let sum = 0, wm = 1;
+    for (const i of run) {
+      const v = G.sol[i].blank ? 0 : VALUES[G.sol[i].ch];
+      if (rightSet.has(i)) { sum += v * letterMult(i); wm *= wordMult(i); } else sum += v;
+    }
+    const sc = sum * wm; wordPts += sc; done.push(runText(run));
+    lines.push({ cls: 'good', l: `Word complete: <b>${esc(runText(run))}</b>${wm > 1 ? ` · ×${wm} word` : ''}`, n: sc });
+  }
+  let bingo = 0;
+  if (right.length === RACK) { bingo = BINGO; lines.push({ cls: 'good', l: 'Bingo! All seven right', n: BINGO }); }
+  let streak = 0;
+  if (!wrong.length && right.length >= 2) {
+    p.streak++;
+    if (G.opts.streak && p.streak >= 2) { streak = STREAK_STEP * (p.streak - 1); lines.push({ cls: 'good', l: `Hot streak: ${p.streak} perfect turns`, n: streak }); }
+  } else if (wrong.length) p.streak = 0;
+  const total = base - pen + wordPts + bingo + streak;
+  p.score += total; p.right += right.length; p.wrong += wrong.length; p.words += done.length;
+
+  const used = new Set([...S.pend.values()].map(t => t.id));
+  p.rack = p.rack.filter(t => !used.has(t.id));
+  for (const w of wrong) G.bag.push(w.ch);
+  shuffle(G.bag); refill(p);
+  G.passes = 0;
+  S.flash = new Map(); S.fresh = new Set(right.map(r => r.i));
+  for (const w of wrong) S.flash.set(w.i, w.ch);
+  G.log.push({ who: G.cur, text: `${right.length}✓ ${wrong.length}✕${done.length ? ' · <b>' + done.map(esc).join(', ') + '</b>' : ''}`, n: total });
+  S.pend = new Map(); S.selected = null;
+  G.phase = 'result'; save(); render();
+  $('#resultTitle').textContent = total > 0 ? `+${total} for ${p.name}` : total < 0 ? `${total} for ${p.name}` : `No points for ${p.name}`;
+  $('#resultList').innerHTML = lines.map(x => `<li class="${x.cls}"><span>${x.l}</span><span class="n">${x.n > 0 ? '+' : ''}${x.n}</span></li>`).join('')
+    + `<li class="total"><span>Turn total</span><span class="n">${total > 0 ? '+' : ''}${total}</span></li>`;
+  $('#resultDlg').hidden = false; $('#resultOk').focus();
+  playSound(right.length && !wrong.length ? 'good' : wrong.length && !right.length ? 'bad' : 'mixed');
+}
+$('#resultOk').addEventListener('click', () => { $('#resultDlg').hidden = true; S.flash = new Map(); afterTurn(); });
+
+function afterTurn() {
+  if (!hiddenCount()) return endGame('Every tile is face up.');
+  if (G.opts.gameMin && G.gameLeft <= 0) return endGame('The game clock ran out.');
+  if (G.passes >= G.players.length * 2) return endGame('Everyone passed twice in a row.');
+  G.cur = (G.cur + 1) % G.players.length; G.turn++;
+  beginTurnPrompt();
+}
+
+function passTurn(reason) {
+  const p = cur();
+  p.streak = 0; G.passes++;
+  G.log.push({ who: G.cur, text: reason || 'Passed' });
+  resetTurnUI(); G.phase = 'between'; save();
+  afterTurn();
+}
+
+function doSwap() {
+  const p = cur(), ids = S.swapSel;
+  if (!ids.size) { S.swapMode = false; render(); return; }
+  const back = p.rack.filter(t => ids.has(t.id));
+  p.rack = p.rack.filter(t => !ids.has(t.id));
+  refill(p);
+  for (const t of back) G.bag.push(t.ch);
+  shuffle(G.bag); p.streak = 0; G.passes = 0;
+  G.log.push({ who: G.cur, text: `Swapped ${back.length} tile${back.length > 1 ? 's' : ''}` });
+  resetTurnUI(); G.phase = 'between'; save();
+  afterTurn();
+}
+
+// Peek: pay to flip one tile. Its letter leaves the bag (or a rack, if every copy has been drawn).
+function peek(i) {
+  if (!G.sol[i] || G.rev[i] || S.pend.has(i)) return;
+  const p = cur(), ch = G.sol[i].ch;
+  let k = G.bag.indexOf(ch);
+  if (k >= 0) G.bag.splice(k, 1);
+  else {
+    const order = [G.cur, ...G.players.map((_, j) => j).filter(j => j !== G.cur)];
+    for (const j of order) {
+      const pl = G.players[j], usedIds = j === G.cur ? new Set([...S.pend.values()].map(t => t.id)) : new Set();
+      const t = pl.rack.find(t => t.ch === ch && !usedIds.has(t.id));
+      if (t) { pl.rack = pl.rack.filter(x => x !== t); refill(pl); break; }
+    }
+  }
+  G.rev[i] = 3; p.score -= PEEK_COST; p.peeks++; G.peekedThisTurn = true; S.peekMode = false; S.fresh = new Set([i]);
+  G.log.push({ who: G.cur, text: `Peeked: <b>${ch}</b>`, n: -PEEK_COST });
+  save(); render();
+  if (!hiddenCount()) { G.phase = 'between'; endGame('Every tile is face up.'); }
+}
+
+function endGame(reason) {
+  G.over = true; G.phase = 'over'; G.endReason = reason;
+  for (const p of G.players) { p.left = p.rack.reduce((s, t) => s + VALUES[t.ch], 0); p.score -= p.left; }
+  const best = store.get('rtt-best') || {};
+  let note = reason;
+  if (G.players.length === 1) {
+    const p = G.players[0], prev = best[G.code];
+    if (prev == null || p.score > prev) { best[G.code] = p.score; store.set('rtt-best', best); if (prev != null) note += ` New best on this board (was ${prev}).`; }
+    else note += ` Your best on this board is ${prev}.`;
+  }
+  save(); render();
+  const ranked = G.players.map((p, k) => ({ ...p, k })).sort((a, b) => b.score - a.score);
+  $('#endTitle').textContent = G.players.length === 1 ? `You scored ${ranked[0].score}` : `${ranked[0].name} wins with ${ranked[0].score}`;
+  $('#endMsg').textContent = note;
+  $('#finalList').innerHTML = ranked.map(p => `<li><span class="dot" style="background:${SEATS[p.k]}"></span>
+    <span style="min-width:0;display:flex;flex-direction:column"><strong>${esc(p.name)}</strong>
+    <span class="adj">${p.right} right · ${p.wrong} wrong · ${p.words} word${p.words === 1 ? '' : 's'} finished${p.peeks ? ` · ${p.peeks} peek${p.peeks > 1 ? 's' : ''}` : ''}${p.left ? ` · −${p.left} left on rack` : ''}</span></span>
+    <span class="pts">${p.score}</span></li>`).join('');
+  $('#endDlg').hidden = false;
+  playSound('end');
+}
+$('#seeBoard').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = true; render(); });
+$('#replayBtn').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = false; startGame(G.code); });
+$('#newBtn').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = false; store.del('rtt-game'); G = null; show('setup'); });
+$('#quitBtn').addEventListener('click', () => {
+  if (!G || G.over) { S.showAll = false; store.del('rtt-game'); G = null; show('setup'); return; }
+  if (confirm('End this game now? Tiles on racks will count against each player.')) { resetTurnUI(); endGame('Game ended early.'); }
+});
+
+// ---------- Clocks ----------
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now(), dt = (now - lastTick) / 1000; lastTick = now;
+  if (!G || G.over || G.phase !== 'turn' || document.hidden) return;
+  if (G.opts.gameMin) { G.gameLeft -= dt; if (G.gameLeft <= 0) { G.gameLeft = 0; resetTurnUI(); return endGame('The game clock ran out.'); } }
+  if (G.opts.turnSec) {
+    const before = Math.ceil(G.turnLeft);
+    G.turnLeft -= dt;
+    if (G.turnLeft <= 0) { toast(`Time's up for ${cur().name}.`); playSound('bad'); return passTurn('Ran out of time'); }
+    if (Math.ceil(G.turnLeft) !== before && G.turnLeft <= 5) playSound('tick');
+  }
+  renderClocks();
+  if (Math.floor(now / 2000) !== Math.floor((now - dt * 1000) / 2000)) save();
+}, 250);
+
+// ---------- Sound ----------
+let audio = null;
+document.addEventListener('pointerdown', () => { if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch {} } }, { once: true });
+function playSound(kind) {
+  if (!audio) return;
+  const notes = { good: [660, 880], bad: [220, 165], mixed: [440, 330], tick: [990], end: [523, 659, 784] }[kind] || [440];
+  notes.forEach((f, k) => {
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + k * .11;
+    o.frequency.value = f; o.type = 'triangle';
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(kind === 'tick' ? .05 : .12, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .18);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + .2);
+  });
+}
+
+// ---------- Drag and tap (mouse and touch) ----------
+let drag = null;
+const rackTile = id => G && cur().rack.find(t => t.id === id);
+document.addEventListener('pointerdown', e => {
+  const t = e.target.closest('[data-tile-id]');
+  if (!t || e.button > 0 || !G || G.phase !== 'turn') return;
+  const src = t.dataset.src;
+  drag = { id: t.dataset.tileId, src, cell: src === 'board' ? +t.closest('[data-cell]').dataset.cell : null, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, el: t, hover: null };
+  try { t.setPointerCapture(e.pointerId); } catch {}
+  e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved) {
+    if (S.swapMode || Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+    drag.moved = true;
+    const gh = document.createElement('div');
+    gh.className = 'ghost';
+    gh.innerHTML = rtileHTML(rackTile(drag.id)?.ch, '', '');
+    document.body.appendChild(gh);
+    drag.ghost = gh; drag.el.classList.add('dragging');
+  }
+  drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-cell]');
+  if (under !== drag.hover) { drag.hover?.classList.remove('hover'); drag.hover = under; under?.classList.add('hover'); }
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  d.ghost?.remove(); d.hover?.classList.remove('hover'); d.el.classList.remove('dragging');
+  if (cancel) { render(); return; }
+  if (!d.moved) { tapTile(d); return; }
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const cellEl = under?.closest('[data-cell]');
+  if (cellEl) placeTile(d.id, +cellEl.dataset.cell, d.cell);
+  else if (under?.closest('#rack')) {
+    if (d.src === 'board') S.pend.delete(d.cell);
+    const over = under.closest('[data-tile-id]');
+    if (over && over.dataset.tileId !== d.id) reorder(d.id, over.dataset.tileId);
+    render();
+  } else { if (d.src === 'board') S.pend.delete(d.cell); render(); }
+}
+document.addEventListener('pointerup', e => endDrag(e, false));
+document.addEventListener('pointercancel', e => endDrag(e, true));
+function reorder(id, beforeId) {
+  const rack = cur().rack, from = rack.findIndex(t => t.id === id); if (from < 0) return;
+  const [t] = rack.splice(from, 1);
+  const to = rack.findIndex(x => x.id === beforeId);
+  if (to < 0) rack.push(t); else rack.splice(to, 0, t);
+}
+function tapTile(d) {
+  if (d.src === 'board') { S.pend.delete(d.cell); render(); return; }
+  if (S.swapMode) { S.swapSel.has(d.id) ? S.swapSel.delete(d.id) : S.swapSel.add(d.id); render(); return; }
+  S.selected = S.selected === d.id ? null : d.id; render();
+}
+$('#board').addEventListener('click', e => {
+  const c = e.target.closest('[data-cell]'); if (!c || !G || G.phase !== 'turn') return;
+  const i = +c.dataset.cell;
+  if (S.peekMode) { peek(i); return; }
+  if (S.selected && G.sol[i] && !G.rev[i] && !S.pend.has(i)) placeTile(S.selected, i, null);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (S.peekMode || S.swapMode || S.selected) { S.peekMode = false; S.swapMode = false; S.selected = null; render(); } }
+  else if (e.key === 'Enter' && G?.phase === 'turn' && S.pend.size && !e.target.closest('button,input')) checkMove();
+});
+
+// ---------- Rendering ----------
+function tileHTML(ch, cls, attrs) {
+  return `<span class="tile${cls}" ${attrs || ''}><b>${ch}</b><i>${VALUES[ch]}</i></span>`;
+}
+function rtileHTML(ch, cls, attrs) {
+  if (!ch) return '';
+  return `<button type="button" class="rtile${cls}" ${attrs}>${ch}<i>${VALUES[ch]}</i></button>`;
+}
+function renderBoard() {
+  const targeting = G.phase === 'turn' && (S.selected || S.peekMode);
+  let html = '';
+  for (let i = 0; i < 225; i++) {
+    const prem = PREM[i], s = G.sol[i], p = S.pend.get(i);
+    let inner = '', cls = 'cell' + (prem ? ' ' + prem : '');
+    if (!s) { cls += ' void'; inner = i === CENTER ? '★' : prem; if (i === CENTER) cls += ' star'; }
+    else if (G.rev[i]) {
+      const fresh = S.fresh.has(i) ? ' fresh' : '';
+      if (s.blank) inner = `<span class="tile blank clue${fresh}"><b>${s.ch}</b></span>`;
+      else inner = tileHTML(s.ch, (G.rev[i] === 2 ? ' clue' : G.rev[i] === 3 ? ' peek' : fresh ? ' right' : '') + fresh);
+    }
+    else if (S.showAll) inner = tileHTML(s.ch, ' unfound');
+    else if (S.flash.has(i)) inner = tileHTML(S.flash.get(i), ' wrong', '');
+    else if (p) inner = tileHTML(p.ch, ' pending', `data-tile-id="${p.id}" data-src="board" role="button" tabindex="0" aria-label="Pick up ${p.ch}"`);
+    else {
+      const nots = G.opts.notes && G.notes[i] ? `<span class="nots" aria-label="Not ${G.notes[i].split('').join(', ')}">${G.notes[i]}</span>` : '';
+      inner = `<span class="tile down">${prem ? `<span class="pm ${prem}">${prem}</span>` : ''}${nots}</span>`;
+      if (targeting) cls += ' target';
+    }
+    html += `<div class="${cls}" data-cell="${i}">${inner}</div>`;
+  }
+  $('#board').innerHTML = html;
+  S.fresh = new Set();
+}
+function renderRack() {
+  const p = cur(), hideRack = G.phase === 'pass' || G.over;
+  const used = new Set([...S.pend.values()].map(t => t.id));
+  const tiles = hideRack ? [] : p.rack.filter(t => !used.has(t.id));
+  $('#rack').innerHTML = G.over ? '<span class="rack-empty">Game over.</span>'
+    : hideRack ? '<span class="rack-empty">Rack hidden until the next player is ready.</span>'
+    : tiles.length ? tiles.map(t => rtileHTML(t.ch, (S.selected === t.id ? ' sel' : '') + (S.swapSel.has(t.id) ? ' swap' : ''), `data-tile-id="${t.id}" data-src="rack" aria-label="Tile ${t.ch}"`)).join('')
+    : p.rack.length ? '<span class="rack-empty">All your tiles are on the board.</span>' : '<span class="rack-empty">Your rack is empty.</span>';
+
+  const pv = $('#preview');
+  if (G.over) pv.innerHTML = '';
+  else if (S.swapMode) pv.innerHTML = `<span class="muted">Tap the tiles to put back in the bag (${S.swapSel.size} chosen). Swapping ends your turn.</span>`;
+  else if (S.peekMode) pv.innerHTML = `<span class="muted">Tap any face-down tile to flip it for ${PEEK_COST} points.</span>`;
+  else if (S.pend.size) {
+    let pot = 0; for (const [i, t] of S.pend) pot += VALUES[t.ch] * letterMult(i);
+    pv.innerHTML = `<span class="muted">${S.pend.size} tile${S.pend.size > 1 ? 's' : ''} down. All right would be at least <b style="color:var(--ink)">${pot * S.pend.size}</b>; each wrong one costs its value.</span>`;
+  } else if (S.selected) pv.innerHTML = '<span class="muted">Tap a face-down tile to put your letter there, or drag it.</span>';
+  else pv.innerHTML = G.phase === 'turn' ? '<span class="muted">Drag or tap your tiles onto face-down squares where you think they were played.</span>' : '';
+
+  const a = $('#actions');
+  if (G.over || G.phase !== 'turn') { a.innerHTML = G.over && hiddenCount() ? `<button class="btn" type="button" data-act="toggleAll">${S.showAll ? 'Hide unfound tiles' : 'Show the full board'}</button>` : ''; return; }
+  if (S.swapMode) {
+    a.innerHTML = `<button class="btn" type="button" data-act="swapCancel">Cancel</button>
+      <button class="btn primary" type="button" data-act="swapGo" ${S.swapSel.size && S.swapSel.size <= G.bag.length ? '' : 'disabled'}>Swap ${S.swapSel.size || ''}</button>`;
+    return;
+  }
+  const canPeek = G.opts.peek && !G.peekedThisTurn;
+  a.innerHTML = `
+    <button class="btn" type="button" data-act="recall" ${S.pend.size ? '' : 'disabled'}>Recall</button>
+    <button class="btn" type="button" data-act="shuffle">Shuffle</button>
+    ${G.opts.peek ? `<button class="btn" type="button" data-act="peek" aria-pressed="${S.peekMode}" ${canPeek ? '' : 'disabled'}>Peek −${PEEK_COST}</button>` : ''}
+    <button class="btn" type="button" data-act="swap" ${G.bag.length && !S.pend.size ? '' : 'disabled'}>Swap</button>
+    <button class="btn" type="button" data-act="pass">Pass</button>
+    <button class="btn primary" type="button" data-act="check" ${S.pend.size ? '' : 'disabled'}>Check</button>`;
+}
+$('#actions').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || !G) return;
+  const act = b.dataset.act;
+  if (act === 'toggleAll') { S.showAll = !S.showAll; render(); return; }
+  if (G.phase !== 'turn') return;
+  if (act === 'recall') { S.pend = new Map(); S.selected = null; }
+  else if (act === 'shuffle') shuffle(cur().rack);
+  else if (act === 'peek') { S.peekMode = !S.peekMode; S.selected = null; }
+  else if (act === 'swap') { S.pend = new Map(); S.swapMode = true; S.swapSel = new Set(); S.selected = null; }
+  else if (act === 'swapCancel') { S.swapMode = false; S.swapSel = new Set(); }
+  else if (act === 'swapGo') return doSwap();
+  else if (act === 'pass') { if (S.pend.size && !confirm('Pass without checking the tiles you put down?')) return; return passTurn(); }
+  else if (act === 'check') return checkMove();
+  render();
+});
+
+function renderClocks() {
+  const tl = $('#turnline');
+  const p = cur();
+  let shot = '';
+  if (G.opts.turnSec && !G.over) shot = `<span class="shot${G.turnLeft <= 10 ? ' low' : ''}" aria-label="Turn time left">${fmt(G.turnLeft)}</span>`;
+  const label = G.over ? `<span class="pill">Game over</span>` : `<span class="pill">${esc(p.name)}'s turn</span>`;
+  const html = label + shot;
+  if (tl.innerHTML !== html) tl.innerHTML = html;
+  $('#gameClockLine').hidden = !G.opts.gameMin;
+  if (G.opts.gameMin) { $('#gameClock').textContent = fmt(G.gameLeft); $('#gameClock').classList.toggle('low', G.gameLeft <= 60); }
+}
+function renderSide() {
+  $('#scores').innerHTML = G.players.map((p, k) => `<div class="score${k === G.cur && !G.over ? ' now' : ''}">
+    <span class="dot" style="background:${SEATS[k]}"></span>
+    <span class="nm"><strong>${esc(p.name)}</strong><span>${p.right} right · ${p.wrong} wrong${p.streak >= 2 ? ` · 🔥 ${p.streak}` : ''}</span></span>
+    <span class="pts">${p.score}</span></div>`).join('');
+  const total = totalTiles(), found = total - hiddenCount();
+  $('#foundN').textContent = `${found} / ${total}`;
+  $('#foundBar').style.width = (found / total * 100) + '%';
+  $('#bagN').textContent = G.bag.length;
+  $('#codeTag').textContent = G.code;
+  // Tracker: letters still face down that the current player isn't holding.
+  const cnt = {};
+  for (let i = 0; i < 225; i++) if (G.sol[i] && !G.rev[i]) cnt[G.sol[i].ch] = (cnt[G.sol[i].ch] || 0) + 1;
+  if (G.phase === 'turn') for (const t of cur().rack) cnt[t.ch]--;
+  $('#tracker').innerHTML = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(L => `<span class="${cnt[L] > 0 ? '' : 'gone'}">${L}<em>${Math.max(0, cnt[L] || 0)}</em></span>`).join('');
+  $('#log').innerHTML = G.log.slice().reverse().map(x => `<li><span class="dot" style="background:${x.who >= 0 ? SEATS[x.who] : 'var(--muted)'}"></span>
+    <span class="what">${x.who >= 0 ? esc(G.players[x.who].name) + ': ' : ''}${x.text}</span>
+    <span class="n${x.n < 0 ? ' neg' : ''}">${x.n == null ? '' : (x.n > 0 ? '+' : '') + x.n}</span></li>`).join('');
+  $('#whoBar').innerHTML = `<span class="chip">Board <code>${esc(G.code)}</code></span>`;
+}
+function render() {
+  if (!G) return;
+  renderBoard(); renderRack(); renderSide(); renderClocks();
+}
+function show(view) {
+  for (const v of ['setup', 'loading', 'game']) $('#' + v + 'View').hidden = v !== view;
+  if (view === 'setup') { $('#whoBar').innerHTML = ''; renderSetup(); }
+  if (view === 'game') render();
+}
+let toastT = null;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+
+$('#homeBtn').addEventListener('click', () => { if (G && !G.over) { save(); } show('setup'); });
+$('#startBtn').addEventListener('click', () => {
+  const code = prefs.board === 'daily' ? dailyCode() : prefs.board === 'code' ? $('#codeIn').value : prefs.words + (1 + rand(999999));
+  startGame(code);
+});
+$('#resumeBtn').addEventListener('click', () => {
+  const saved = store.get('rtt-game'); if (!saved) return;
+  G = saved; resetTurnUI(); show('game');
+  if (G.phase === 'result' || G.phase === 'between') { afterTurn(); return; }
+  if (G.players.length > 1) { G.phase = 'pass'; beginTurnPrompt(); } else { G.phase = 'turn'; render(); }
+});
+window.addEventListener('pagehide', save);
+const qs = new URLSearchParams(location.search).get('board');
+if (qs && parseCode(qs)) { prefs.board = 'code'; $('#codeIn').value = qs.toUpperCase(); }
+show('setup');
+</script>
+</body>
+</html>
