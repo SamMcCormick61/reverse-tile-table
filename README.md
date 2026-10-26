@@ -2,7 +2,7 @@
 
 A crossword tile game played backwards. A full game has already been played to the last of the 100 tiles, then every tile was turned face down. You draw seven letters from that same bag and put each one back where you think it was played.
 
-**Play:** https://sammccormick61.github.io/reverse-scrabble/ (once GitHub Pages is switched on for this repo)
+**Play:** https://sammccormick61.github.io/reverse-tile-table/ (once GitHub Pages is switched on for this repo)
 
 ## How it plays
 
