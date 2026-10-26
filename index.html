@@ -211,6 +211,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 
 /* Overlays */
 .overlay { position: fixed; inset: 0; z-index: 70; background: var(--scrim); display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.overlay.paused { background: rgba(20,12,8,.96); }
 .dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(100%, 460px); display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 50px var(--shadow); }
 .dialog h3 { font-size: 22px; }
 .dialog.wide { width: min(100%, 620px); }
@@ -294,7 +295,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
         <div class="row" style="justify-content:space-between;align-items:center">
           <h2>How scoring works</h2>
           <div class="row">
-            <button class="btn" id="resumeBtn" type="button" hidden>Continue last game</button>
+            <button class="btn" id="resumeBtn" type="button" hidden>Continue saved game</button>
             <button class="btn primary" id="startBtn" type="button">Deal the board</button>
           </div>
         </div>
@@ -362,6 +363,14 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 </div>
 
 <!-- Pass the device -->
+<!-- Paused -->
+<div class="overlay paused" id="pauseDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+    <h3 id="pauseTitle">Game paused</h3>
+    <p class="muted" id="pauseMsg" style="margin:0"></p>
+    <button class="btn primary" id="unpauseBtn" type="button">Resume</button>
+  </div>
+</div>
 <div class="overlay" id="passDlg" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="passTitle">
     <h3 id="passTitle"></h3>
@@ -395,7 +404,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '2';
+const APP_VERSION = '3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = 'v' + APP_VERSION;
@@ -561,7 +570,7 @@ function resetTurnUI() { S.selected = null; S.pend = new Map(); S.swapMode = fal
 
 function beginTurnPrompt() {
   resetTurnUI();
-  G.turnLeft = G.opts.turnSec; G.peekedThisTurn = false;
+  G.turnLeft = G.opts.turnSec; G.peekedThisTurn = false; G.paused = false;
   if (G.players.length === 1) { G.phase = 'turn'; save(); render(); return; }
   G.phase = 'pass'; save(); render();
   const p = cur();
@@ -721,11 +730,31 @@ $('#quitBtn').addEventListener('click', () => {
   if (confirm('End this game now? Tiles on racks will count against each player.')) { resetTurnUI(); endGame('Game ended early.'); }
 });
 
+// ---------- Pause ----------
+// Pausing stops the turn timer and game clock and covers the board and rack until play resumes.
+function setPaused(on) {
+  if (!G || G.over || G.phase !== 'turn') return;
+  G.paused = on; save();
+  showPause();
+}
+function showPause() {
+  const on = !!(G && G.paused && !G.over);
+  $('#pauseDlg').hidden = !on;
+  if (!on) { render(); return; }
+  const bits = [];
+  if (G.opts.turnSec) bits.push(`${cur().name} has ${fmt(G.turnLeft)} left this turn`);
+  if (G.opts.gameMin) bits.push(`${fmt(G.gameLeft)} left on the game clock`);
+  $('#pauseMsg').textContent = (bits.length ? bits.join(', ') + '. ' : '') + 'The clocks are stopped. The game is saved, so you can close the page and continue later.';
+  $('#unpauseBtn').focus();
+}
+$('#unpauseBtn').addEventListener('click', () => setPaused(false));
+$('#turnline').addEventListener('click', e => { if (e.target.closest('[data-act="pause"]')) setPaused(true); });
+
 // ---------- Clocks ----------
 let lastTick = performance.now();
 setInterval(() => {
   const now = performance.now(), dt = (now - lastTick) / 1000; lastTick = now;
-  if (!G || G.over || G.phase !== 'turn' || document.hidden) return;
+  if (!G || G.over || G.paused || G.phase !== 'turn' || document.hidden) return;
   if (G.opts.gameMin) { G.gameLeft -= dt; if (G.gameLeft <= 0) { G.gameLeft = 0; resetTurnUI(); return endGame('The game clock ran out.'); } }
   if (G.opts.turnSec) {
     const before = Math.ceil(G.turnLeft);
@@ -813,6 +842,8 @@ $('#board').addEventListener('click', e => {
   if (S.selected && G.sol[i] && !G.rev[i] && !S.pend.has(i)) placeTile(S.selected, i, null);
 });
 document.addEventListener('keydown', e => {
+  if ((e.key === 'p' || e.key === 'P') && !e.target.closest('input') && G && !G.over && G.phase === 'turn') { setPaused(!G.paused); return; }
+  if (G?.paused) return;
   if (e.key === 'Escape') { if (S.peekMode || S.swapMode || S.selected) { S.peekMode = false; S.swapMode = false; S.selected = null; render(); } }
   else if (e.key === 'Enter' && G?.phase === 'turn' && S.pend.size && !e.target.closest('button,input')) checkMove();
 });
@@ -907,7 +938,8 @@ function renderClocks() {
   let shot = '';
   if (G.opts.turnSec && !G.over) shot = `<span class="shot${G.turnLeft <= 10 ? ' low' : ''}" aria-label="Turn time left">${fmt(G.turnLeft)}</span>`;
   const label = G.over ? `<span class="pill">Game over</span>` : `<span class="pill">${esc(p.name)}'s turn</span>`;
-  const html = label + shot;
+  const pause = !G.over && G.phase === 'turn' ? `<button class="btn small" type="button" data-act="pause" aria-label="Pause game">❚❚ Pause</button>` : '';
+  const html = label + shot + pause;
   if (tl.innerHTML !== html) tl.innerHTML = html;
   $('#gameClockLine').hidden = !G.opts.gameMin;
   if (G.opts.gameMin) { $('#gameClock').textContent = fmt(G.gameLeft); $('#gameClock').classList.toggle('low', G.gameLeft <= 60); }
@@ -951,8 +983,11 @@ $('#startBtn').addEventListener('click', () => {
 });
 $('#resumeBtn').addEventListener('click', () => {
   const saved = store.get('rtt-game'); if (!saved) return;
-  G = saved; resetTurnUI(); show('game');
+  G = saved; resetTurnUI();
+  if (G.phase === 'turn') G.paused = true; // coming back mid-turn: start paused so no clock runs before you're ready
+  show('game');
   if (G.phase === 'result' || G.phase === 'between') { afterTurn(); return; }
+  if (G.paused) { G.phase = 'turn'; render(); showPause(); return; }
   if (G.players.length > 1) { G.phase = 'pass'; beginTurnPrompt(); } else { G.phase = 'turn'; render(); }
 });
 window.addEventListener('pagehide', save);

@@ -23,6 +23,7 @@ A crossword tile game played backwards. A full game has already been played to t
 - **Mark wrong guesses**: letters already tried on a square are crossed out on it.
 - **Peek**: once a turn, pay 10 points to flip any tile.
 - **Hot streaks**: back-to-back turns with no wrong tiles earn +10, +20, +30…
+- **Pause**: the Pause button (or the P key) stops both clocks and covers the board and rack until you resume. A paused game survives closing the page.
 - **Swap**: put tiles back in the bag and draw new ones instead of guessing (ends your turn).
 - Tiles played as **blanks** in the finished game start face up as free clues.
 - **Still face down** tracker: counts of every letter still hidden that isn't on your rack.
