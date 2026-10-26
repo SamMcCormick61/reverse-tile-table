@@ -19,6 +19,7 @@ A crossword tile game played backwards. A full game has already been played to t
 - **Turn timer** (30 s to 2 min): run out and your tiles go back on your rack and play moves on.
 - **Game clock** (10 to 45 min): when it hits zero the game ends.
 - **Opening word**: the first word of the finished game starts face up as a foothold.
+- **Show first letters**: the first letter of every word starts face up. Easier and quicker.
 - **Mark wrong guesses**: letters already tried on a square are crossed out on it.
 - **Peek**: once a turn, pay 10 points to flip any tile.
 - **Hot streaks**: back-to-back turns with no wrong tiles earn +10, +20, +30…
