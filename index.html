@@ -285,6 +285,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
       <div class="card stack">
         <h2>Helpers</h2>
         <label class="check"><input type="checkbox" id="optOpener" checked><span>Show the opening word<small>The first word of the finished game starts face up.</small></span></label>
+        <label class="check"><input type="checkbox" id="optFirsts"><span>Show first letters<small>The first letter of every word starts face up. Easier and quicker.</small></span></label>
         <label class="check"><input type="checkbox" id="optNotes" checked><span>Mark wrong guesses<small>Letters already tried on a square are crossed out on it.</small></span></label>
         <label class="check"><input type="checkbox" id="optPeek" checked><span>Allow peeks<small>Once a turn, pay 10 points to flip any tile face up.</small></span></label>
         <label class="check"><input type="checkbox" id="optStreak" checked><span>Hot streaks<small>Bonus for back-to-back turns with no wrong tiles.</small></span></label>
@@ -394,7 +395,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '1';
+const APP_VERSION = '2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = 'v' + APP_VERSION;
@@ -434,13 +435,13 @@ const RULES = [
   `A <b>wrong</b> tile costs its letter value (at least 1) and goes back in the bag.`,
   `Turn the last face-down tile of a word and you also score the <b>whole word</b>, with double and triple word squares you covered that turn.`,
   `All seven right in one turn is a <b>bingo</b>: +${BINGO}. With hot streaks on, each perfect turn after another earns +${STREAK_STEP}, +${STREAK_STEP * 2}, and so on.`,
-  `Tiles played as blanks in the finished game start face up as free clues.`,
+  `Tiles played as blanks in the finished game start face up as free clues. With <b>Show first letters</b> on, so does the first letter of every word.`,
   `The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on your rack then count against you.`,
 ];
 $('#rulesList').innerHTML = RULES.map(r => `<li>${r}</li>`).join('');
 
 // ---------- Setup ----------
-const prefs = Object.assign({ players: ['Player 1'], board: 'new', words: 'E', turnSec: 60, gameMin: 0, opener: true, notes: true, peek: true, streak: true }, store.get('rtt-prefs') || {});
+const prefs = Object.assign({ players: ['Player 1'], board: 'new', words: 'E', turnSec: 60, gameMin: 0, opener: true, firsts: false, notes: true, peek: true, streak: true }, store.get('rtt-prefs') || {});
 function savePrefs() { store.set('rtt-prefs', prefs); }
 function renderSetup() {
   $('#playerList').innerHTML = prefs.players.map((n, k) => `
@@ -454,7 +455,7 @@ function renderSetup() {
   $('#codeField').hidden = prefs.board !== 'code';
   $('#turnOpts').innerHTML = TURN_OPTS.map(([v, l]) => `<button class="btn small" type="button" data-turn="${v}" aria-pressed="${v === prefs.turnSec}">${l}</button>`).join('');
   $('#gameOpts').innerHTML = GAME_OPTS.map(([v, l]) => `<button class="btn small" type="button" data-game="${v}" aria-pressed="${v === prefs.gameMin}">${l}</button>`).join('');
-  $('#optOpener').checked = prefs.opener; $('#optNotes').checked = prefs.notes; $('#optPeek').checked = prefs.peek; $('#optStreak').checked = prefs.streak;
+  $('#optOpener').checked = prefs.opener; $('#optFirsts').checked = prefs.firsts; $('#optNotes').checked = prefs.notes; $('#optPeek').checked = prefs.peek; $('#optStreak').checked = prefs.streak;
   $('#boardNote').textContent = prefs.board === 'daily' ? `Everyone who picks today's board gets the same finished game (code ${dailyCode()}). Compare scores with friends.`
     : prefs.board === 'code' ? 'Type the code from a game a friend played to get the exact same board.'
     : 'A brand-new finished game is played out for you.';
@@ -474,7 +475,7 @@ $('#setupView').addEventListener('click', e => {
   else return;
   savePrefs(); renderSetup();
 });
-for (const [id, key] of [['#optOpener', 'opener'], ['#optNotes', 'notes'], ['#optPeek', 'peek'], ['#optStreak', 'streak']])
+for (const [id, key] of [['#optOpener', 'opener'], ['#optFirsts', 'firsts'], ['#optNotes', 'notes'], ['#optPeek', 'peek'], ['#optStreak', 'streak']])
   $(id).addEventListener('change', e => { prefs[key] = e.target.checked; savePrefs(); });
 
 function parseCode(s) {
@@ -535,12 +536,13 @@ async function startGame(code, again) {
     v: APP_VERSION, code: p.mode + p.seed, sol, rev: new Array(225).fill(0), notes: {}, bag: [],
     players: names.map(name => ({ name, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0 })),
     cur: 0, turn: 1, passes: 0, log: [], over: false, endReason: '',
-    opts: { turnSec: prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
+    opts: { turnSec: prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, firsts: prefs.firsts, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
     gameLeft: prefs.gameMin * 60, turnLeft: prefs.turnSec, phase: 'pass', peekedThisTurn: false, firstWord: gen.words[0]?.cells || [],
   };
   // Blank tiles from the finished game are free clues; so is the opening word if that helper is on.
   for (let i = 0; i < 225; i++) if (sol[i]?.blank) G.rev[i] = 2;
   if (G.opts.opener) for (const i of G.firstWord) G.rev[i] = G.rev[i] || 2;
+  if (G.opts.firsts) for (const run of allRuns(sol)) G.rev[run[0]] = G.rev[run[0]] || 2;
   for (let i = 0; i < 225; i++) if (sol[i] && !G.rev[i]) G.bag.push(sol[i].ch);
   shuffle(G.bag);
   for (const pl of G.players) refill(pl);
