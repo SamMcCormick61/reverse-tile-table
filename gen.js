@@ -1,9 +1,10 @@
-// Board generator: plays out a full "finished game" of Scrabble so every tile in the bag ends up on the board.
+// Board generator: plays out a full finished crossword tile game so every tile in the bag ends up on the board.
 // Works in the browser (window.RSGen) and in Node (module.exports) so it can be tested from the command line.
 (function (root) {
   const N = 15, CENTER = 112;
-  const COUNTS = {A:9,B:2,C:2,D:4,E:12,F:2,G:3,H:2,I:9,J:1,K:1,L:4,M:2,N:6,O:8,P:2,Q:1,R:6,S:4,T:6,U:4,V:2,W:2,X:1,Y:2,Z:1,'?':2};
-  const VALUES = {A:1,B:3,C:3,D:2,E:1,F:4,G:2,H:4,I:1,J:8,K:5,L:1,M:3,N:1,O:1,P:3,Q:10,R:1,S:1,T:1,U:1,V:4,W:4,X:8,Y:4,Z:10,'?':0};
+  // This game's own 100-tile bag: counts follow English letter frequency, values how hard a letter is to use.
+  const COUNTS = {A:9,B:2,C:3,D:4,E:11,F:2,G:3,H:3,I:8,J:1,K:1,L:4,M:2,N:6,O:7,P:2,Q:1,R:6,S:5,T:7,U:3,V:2,W:2,X:1,Y:2,Z:1,'?':2};
+  const VALUES = {A:1,B:4,C:3,D:2,E:1,F:4,G:3,H:3,I:1,J:9,K:6,L:2,M:3,N:1,O:1,P:3,Q:10,R:1,S:1,T:1,U:2,V:5,W:4,X:8,Y:3,Z:10,'?':0};
   const A = 65;
 
   function makeRng(seed) {

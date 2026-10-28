@@ -1,0 +1,62 @@
+# Builds the Android app. Run it from the Actions tab ("Build Android app" > Run workflow).
+# With the upload-key secrets set it makes a signed .aab to upload to Google Play;
+# it always makes a debug .apk you can install straight onto a phone to try.
+name: Build Android app
+
+on:
+  workflow_dispatch:
+    inputs:
+      versionName:
+        description: Version people see in the Play Store (e.g. 1.0, 1.1)
+        required: true
+        default: '1.0'
+  pull_request:
+    paths: ['android/**', 'scripts/**', 'package*.json', 'capacitor.config.json', '.github/workflows/android.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run sync
+
+      - name: Debug APK (install on a phone to try)
+        working-directory: android
+        env:
+          VERSION_NAME: ${{ inputs.versionName || '1.0' }}
+        run: ./gradlew assembleDebug -PversionCode=$GITHUB_RUN_NUMBER -PversionName="$VERSION_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reverse-tile-table-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Signed bundle for Google Play
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          VERSION_NAME: ${{ inputs.versionName }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "::error::Add the UPLOAD_KEYSTORE_* secrets first (see ANDROID.md)"; exit 1; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export UPLOAD_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          ./gradlew bundleRelease -PversionCode=$GITHUB_RUN_NUMBER -PversionName="$VERSION_NAME"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: reverse-tile-table-play-bundle
+          path: android/app/build/outputs/bundle/release/*.aab

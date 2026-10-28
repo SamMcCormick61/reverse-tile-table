@@ -1,0 +1,22 @@
+{
+  "name": "reverse-tile-table",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reverse Tile Table as an Android app (Capacitor). The web game itself needs no build.",
+  "scripts": {
+    "build:web": "node scripts/build-web.js",
+    "assets": "capacitor-assets generate --android",
+    "sync": "npm run build:web && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@fontsource/bricolage-grotesque": "^5.3.0",
+    "@fontsource/figtree": "^5.3.0",
+    "@fontsource/jost": "^5.3.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.6.0"
+  }
+}
