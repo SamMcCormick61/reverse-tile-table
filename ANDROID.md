@@ -8,9 +8,9 @@ App ID: `io.github.sammccormick61.reversetiletable`. **This can never change onc
 
 1. On GitHub, open **Actions** > **Build Android app** > **Run workflow**.
 2. When it finishes (about 5 minutes), open the run and download **reverse-tile-table-debug-apk**.
-3. Unzip it, copy the `.apk` to an Android phone and open it. Android will ask you to allow installs from that app (Files, Drive, etc.) once.
+3. Unzip it, copy the `.apk` to an Android phone and open it. Android will ask you to allow installs from that app (Files, Drive, etc.) once. Later test builds install over it. If Android says **App not installed**, uninstall the old copy first: test builds made before 28 October 2026 each had a different key.
 
-The bundle step fails until you've done step 3 below. The debug APK is still made.
+Until you do step 3 below, the Google Play bundle step is skipped (the run stays green) and only the debug APK is made.
 
 ## 2. Make a Google Play developer account
 
