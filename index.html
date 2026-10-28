@@ -271,7 +271,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
         <span class="lbl">Words on the board</span>
         <div class="opts" role="group" aria-label="Words">
           <button class="btn small" type="button" data-words="E" aria-pressed="true">Everyday words</button>
-          <button class="btn small" type="button" data-words="T" aria-pressed="false">Tournament list</button>
+          <button class="btn small" type="button" data-words="T" aria-pressed="false">Full word list</button>
         </div>
         <p class="small-note" id="boardNote">A brand-new finished game is played out for you.</p>
       </div>
@@ -404,7 +404,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '3';
+const APP_VERSION = '4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = 'v' + APP_VERSION;
@@ -417,12 +417,13 @@ function mark(type, base) {
   for (const [r, c] of base) for (const [a, b] of [[r, c], [c, r]])
     for (const rr of [a, 14 - a]) for (const cc of [b, 14 - b]) PREM[rr * N + cc] = type;
 }
-mark('TW', [[0,0],[0,7]]);
-mark('DW', [[1,1],[2,2],[3,3],[4,4],[7,7]]);
-mark('TL', [[1,5],[5,5]]);
-mark('DL', [[0,3],[2,6],[3,7],[6,6]]);
+// This game's own bonus layout (deliberately not the classic board). The center star carries no bonus.
+mark('TW', [[0,4]]);
+mark('DW', [[1,1],[3,6],[5,7]]);
+mark('TL', [[0,0],[4,4],[6,6]]);
+mark('DL', [[0,7],[1,3],[2,7],[3,5],[5,5]]);
 const SEATS = ['var(--seat-0)','var(--seat-1)','var(--seat-2)','var(--seat-3)'];
-const BINGO = 50, PEEK_COST = 10, STREAK_STEP = 10;
+const SWEEP = 50, PEEK_COST = 10, STREAK_STEP = 10;
 const TURN_OPTS = [[0, 'Off'], [30, '30 s'], [60, '1 min'], [90, '90 s'], [120, '2 min']];
 const GAME_OPTS = [[0, 'Off'], [10, '10 min'], [20, '20 min'], [30, '30 min'], [45, '45 min']];
 const letterMult = i => PREM[i] === 'DL' ? 2 : PREM[i] === 'TL' ? 3 : 1;
@@ -443,7 +444,7 @@ const RULES = [
   `A <b>correct</b> tile stays face up and scores its letter value, doubled or tripled on a letter bonus square. Your letter points are then <b>multiplied by how many tiles you got right</b> that turn.`,
   `A <b>wrong</b> tile costs its letter value (at least 1) and goes back in the bag.`,
   `Turn the last face-down tile of a word and you also score the <b>whole word</b>, with double and triple word squares you covered that turn.`,
-  `All seven right in one turn is a <b>bingo</b>: +${BINGO}. With hot streaks on, each perfect turn after another earns +${STREAK_STEP}, +${STREAK_STEP * 2}, and so on.`,
+  `All seven right in one turn is a <b>clean sweep</b>: +${SWEEP}. With hot streaks on, each perfect turn after another earns +${STREAK_STEP}, +${STREAK_STEP * 2}, and so on.`,
   `Tiles played as blanks in the finished game start face up as free clues. With <b>Show first letters</b> on, so does the first letter of every word.`,
   `The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on your rack then count against you.`,
 ];
@@ -499,8 +500,8 @@ function makeBoard(mode, seed) {
     const viaMain = async () => {
       try {
         const get = n => fetch(n).then(r => { if (!r.ok) throw new Error('Could not load ' + n); return r.text(); }).then(t => t.split(/\s+/).filter(Boolean));
-        const twl = RSGen.buildDict(await get('words.txt'), 8);
-        const d = mode === 'T' ? { main: twl } : { main: RSGen.buildDict(await get('common.txt'), 8), fallback: twl };
+        const full = RSGen.buildDict(await get('words.txt'), 8);
+        const d = mode === 'T' ? { main: full } : { main: RSGen.buildDict(await get('common.txt'), 8), fallback: full };
         await new Promise(r => setTimeout(r, 30));
         resolve(RSGen.generateFull({ ...d, seed, tries: 8 }));
       } catch (err) { reject(err); }
@@ -624,14 +625,14 @@ function checkMove() {
     const sc = sum * wm; wordPts += sc; done.push(runText(run));
     lines.push({ cls: 'good', l: `Word complete: <b>${esc(runText(run))}</b>${wm > 1 ? ` · ×${wm} word` : ''}`, n: sc });
   }
-  let bingo = 0;
-  if (right.length === RACK) { bingo = BINGO; lines.push({ cls: 'good', l: 'Bingo! All seven right', n: BINGO }); }
+  let sweep = 0;
+  if (right.length === RACK) { sweep = SWEEP; lines.push({ cls: 'good', l: 'Clean sweep! All seven right', n: SWEEP }); }
   let streak = 0;
   if (!wrong.length && right.length >= 2) {
     p.streak++;
     if (G.opts.streak && p.streak >= 2) { streak = STREAK_STEP * (p.streak - 1); lines.push({ cls: 'good', l: `Hot streak: ${p.streak} perfect turns`, n: streak }); }
   } else if (wrong.length) p.streak = 0;
-  const total = base - pen + wordPts + bingo + streak;
+  const total = base - pen + wordPts + sweep + streak;
   p.score += total; p.right += right.length; p.wrong += wrong.length; p.words += done.length;
 
   const used = new Set([...S.pend.values()].map(t => t.id));

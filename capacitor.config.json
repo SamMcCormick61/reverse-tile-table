@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.sammccormick61.reversetiletable",
+  "appName": "Reverse Tile Table",
+  "webDir": "www",
+  "backgroundColor": "#2a1a12",
+  "android": {
+    "allowMixedContent": false
+  }
+}

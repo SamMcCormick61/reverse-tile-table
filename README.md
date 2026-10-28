@@ -11,7 +11,7 @@ A crossword tile game played backwards. A full game has already been played to t
 - **Right** tiles flip face up and score their letter value (doubled or tripled on letter squares). Your letter points are **multiplied by the number of tiles you got right** that turn.
 - **Wrong** tiles cost their letter value (at least 1) and go back in the bag.
 - Flip the last face-down tile of a word and you also score the **whole word**, with any double or triple word squares you covered that turn.
-- All seven right is a **bingo** (+50).
+- All seven right is a **clean sweep** (+50).
 - The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on a rack then count against that player.
 
 ### Extra rules (all optional, set before dealing)
@@ -33,9 +33,15 @@ A crossword tile game played backwards. A full game has already been played to t
 - **Fresh deal**: a brand-new finished game.
 - **Today's board**: everyone gets the same board each day, so friends can compare scores.
 - **Board codes** (like `E123456`) recreate an exact board. Add `?board=E123456` to the link to share one.
-- **Everyday words** builds the board from common English words; **Tournament list** uses the full TWL06 list (much harder).
+- **Everyday words** builds the board from common English words; **Full word list** uses the whole ENABLE list (much harder).
+
+The bonus-square layout, tile counts and letter values are this game's own.
 
 Play solo, or pass one device around for 2 to 4 players. Your game is saved in the browser, so a reload picks up where you left off.
+
+## Android app
+
+The game is also packaged as an Android app for Google Play. [ANDROID.md](ANDROID.md) has every step, from trying it on your phone to publishing.
 
 ## How the board is made
 
@@ -46,7 +52,9 @@ Play solo, or pass one device around for 2 to 4 players. Your game is saved in t
 - `index.html` - the whole game (rules, scoring, board, timers)
 - `gen.js` - finished-board generator (also runs under Node for testing)
 - `gen-worker.js` - runs the generator off the main thread
-- `common.txt` - everyday words: the 20,000 most common English words that are also in TWL06, plus all two-letter words
-- `words.txt` - TWL06 word list (from Tile Table)
+- `common.txt` - everyday words: common English words that are also in ENABLE, plus all two-letter words
+- `words.txt` - the ENABLE word list (public domain)
+- `privacy.html` - privacy policy (needed for Google Play)
+- `android/`, `capacitor.config.json`, `scripts/`, `assets/` - the Android app; see [ANDROID.md](ANDROID.md)
 
 Styled to match [Tile Table](https://github.com/SamMcCormick61/tile-table).

@@ -8,8 +8,8 @@ async function list(name) {
 const dicts = {};
 async function dictsFor(mode) {
   if (dicts[mode]) return dicts[mode];
-  const twl = RSGen.buildDict(await list('words.txt'), 8);
-  dicts[mode] = mode === 'T' ? { main: twl } : { main: RSGen.buildDict(await list('common.txt'), 8), fallback: twl };
+  const full = RSGen.buildDict(await list('words.txt'), 8);
+  dicts[mode] = mode === 'T' ? { main: full } : { main: RSGen.buildDict(await list('common.txt'), 8), fallback: full };
   return dicts[mode];
 }
 onmessage = async e => {
