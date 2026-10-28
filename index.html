@@ -119,6 +119,12 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .shot.low { color: var(--bad); border-color: var(--bad); }
 
 .board-wrap { width: 100%; max-width: min(720px, max(340px, calc(100dvh - 320px))); container-type: inline-size; }
+/* Zoom: the view stays board-sized and scrolls; the inner box grows, and every cqw size on the board grows with it. */
+.board-view { max-height: 100cqw; overflow: auto; border-radius: 2cqw; touch-action: pan-x pan-y; overscroll-behavior: contain; scrollbar-width: thin; }
+.board-inner { width: calc(100% * var(--zoom, 1)); container-type: inline-size; }
+.zoom-ctl { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; }
+.zoom-ctl .btn { min-width: 40px; padding: 0 10px; font-size: 18px; }
+.zoom-ctl output { min-width: 46px; text-align: center; font: 600 13px var(--f-body); color: var(--muted); font-variant-numeric: tabular-nums; }
 .board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: .4cqw; padding: 1.8cqw; border-radius: 2cqw;
   background: linear-gradient(160deg, var(--frame), var(--frame-edge)); box-shadow: 0 2.2cqw 4cqw var(--shadow), inset 0 0 0 .3cqw rgba(255,255,255,.06); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .cell { aspect-ratio: 1; border-radius: .6cqw; background: var(--cell); position: relative; display: grid; place-items: center;
@@ -230,6 +236,8 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 80;
   background: var(--ink); color: var(--table); padding: 10px 16px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px var(--shadow); max-width: calc(100vw - 32px); text-align: center; }
 .foot { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; }
+.foot { margin: 28px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+.foot a { color: var(--accent); }
 .ver { font: 600 11px var(--f-body); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; letter-spacing: .04em; }
 </style>
 </head>
@@ -237,7 +245,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <div class="wrap">
   <header class="top">
     <button class="mark" id="homeBtn" type="button" aria-label="Reverse Tile Table home">
-      <span class="minis" aria-hidden="true"><span class="mini">R<i>1</i></span><span class="mini down">?</span><span class="mini">V<i>4</i></span><span class="mini down">?</span></span>
+      <span class="minis" aria-hidden="true"><span class="mini">R<i>1</i></span><span class="mini down">?</span><span class="mini">V<i>5</i></span><span class="mini down">?</span></span>
       <span class="word">Reverse</span>
       <span class="ver" id="verTag"></span>
     </button>
@@ -302,6 +310,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
         <ol class="rules" id="rulesList"></ol>
       </div>
     </div>
+    <p class="foot">Reverse Tile Table <span id="footVer"></span> · <a href="privacy.html">Privacy policy</a></p>
   </section>
 
   <!-- Loading -->
@@ -318,7 +327,14 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
     <div class="game">
       <div class="play-col">
         <div class="turnline" id="turnline"></div>
-        <div class="board-wrap"><div class="board" id="board"></div></div>
+        <div class="board-wrap">
+          <div class="board-view" id="boardView"><div class="board-inner" id="boardInner"><div class="board" id="board"></div></div></div>
+          <div class="zoom-ctl" role="group" aria-label="Board zoom">
+            <button class="btn small" id="zoomOut" type="button" aria-label="Zoom out" disabled>−</button>
+            <output id="zoomPct">100%</output>
+            <button class="btn small" id="zoomIn" type="button" aria-label="Zoom in">+</button>
+          </div>
+        </div>
         <div class="rack-area" id="rackArea">
           <div class="ledge" id="rack"></div>
           <div class="preview" id="preview"></div>
@@ -404,10 +420,10 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '4';
+const APP_VERSION = '5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-$('#verTag').textContent = 'v' + APP_VERSION;
+$('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
 
 // ---------- Rules data ----------
 const VALUES = RSGen.VALUES;
@@ -804,6 +820,7 @@ document.addEventListener('pointermove', e => {
     drag.ghost = gh; drag.el.classList.add('dragging');
   }
   drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+  if (zoom > 1) edgeScroll(e.clientX, e.clientY);
   const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-cell]');
   if (under !== drag.hover) { drag.hover?.classList.remove('hover'); drag.hover = under; under?.classList.add('hover'); }
 });
@@ -825,6 +842,48 @@ function endDrag(e, cancel) {
 }
 document.addEventListener('pointerup', e => endDrag(e, false));
 document.addEventListener('pointercancel', e => endDrag(e, true));
+
+// ---------- Board zoom (buttons, pinch, ctrl + scroll wheel) ----------
+const ZOOM_MAX = 3, ZOOM_STEP = .5;
+let zoom = 1, pinch = null;
+// Zoom to z, keeping the board point under (cx, cy) in place (the middle of the view by default).
+function setZoom(z, cx, cy) {
+  const v = $('#boardView'), r = v.getBoundingClientRect();
+  const px = (cx ?? r.left + r.width / 2) - r.left, py = (cy ?? r.top + r.height / 2) - r.top;
+  const fx = (v.scrollLeft + px) / v.scrollWidth, fy = (v.scrollTop + py) / v.scrollHeight;
+  zoom = Math.min(ZOOM_MAX, Math.max(1, z));
+  $('#boardInner').style.setProperty('--zoom', zoom);
+  v.scrollLeft = fx * v.scrollWidth - px; v.scrollTop = fy * v.scrollHeight - py;
+  $('#zoomPct').textContent = Math.round(zoom * 100) + '%';
+  $('#zoomOut').disabled = zoom <= 1; $('#zoomIn').disabled = zoom >= ZOOM_MAX;
+}
+$('#zoomIn').addEventListener('click', () => setZoom(Math.floor(zoom / ZOOM_STEP + 1e-6) * ZOOM_STEP + ZOOM_STEP));
+$('#zoomOut').addEventListener('click', () => setZoom(Math.ceil(zoom / ZOOM_STEP - 1e-6) * ZOOM_STEP - ZOOM_STEP));
+const touchGap = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+$('#boardView').addEventListener('touchstart', e => {
+  if (e.touches.length !== 2) return;
+  if (drag) endDrag(null, true); // a second finger means pinch, not drag
+  pinch = { gap: touchGap(e.touches), z: zoom };
+}, { passive: true });
+$('#boardView').addEventListener('touchmove', e => {
+  if (!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  const [a, b] = e.touches;
+  setZoom(pinch.z * touchGap(e.touches) / pinch.gap, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+}, { passive: false });
+$('#boardView').addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+$('#boardView').addEventListener('wheel', e => {
+  if (!e.ctrlKey) return; // trackpad pinch arrives as ctrl + wheel
+  e.preventDefault();
+  setZoom(zoom * Math.exp(-e.deltaY / 200), e.clientX, e.clientY);
+}, { passive: false });
+// While dragging a tile on a zoomed board, scroll when the finger nears an edge.
+function edgeScroll(x, y) {
+  const v = $('#boardView'), r = v.getBoundingClientRect(), edge = 36, step = 14;
+  if (x < r.left - edge || x > r.right + edge || y < r.top - edge || y > r.bottom + edge) return;
+  v.scrollBy((x < r.left + edge ? -step : x > r.right - edge ? step : 0), (y < r.top + edge ? -step : y > r.bottom - edge ? step : 0));
+}
+
 function reorder(id, beforeId) {
   const rack = cur().rack, from = rack.findIndex(t => t.id === id); if (from < 0) return;
   const [t] = rack.splice(from, 1);
