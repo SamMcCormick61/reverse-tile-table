@@ -61,7 +61,13 @@ window.RTT_CONFIG = {
     //     { urls: 'turn:global.relay.metered.ca:80', username: 'abc123', credential: 'xyz789' },
     //     { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'abc123', credential: 'xyz789' },
     //   ],
-    turn: [],
+    // Metered free plan (500 MB a month), set up 3 November 2026. Manage it at dashboard.metered.ca.
+    turn: [
+      { urls: 'turn:global.relay.metered.ca:80', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+      { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+      { urls: 'turn:global.relay.metered.ca:443', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+      { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+    ],
   },
 
   board: {
