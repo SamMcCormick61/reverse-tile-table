@@ -14,10 +14,11 @@
 :root {
   --table: #2a1a12; --table-glow: #4a2e1e; --grain: rgba(255,240,220,.025); --grain-dark: rgba(0,0,0,.06);
   --ink: #f3e9d8; --muted: #bba98f; --line: #4d3628; --panel: #33221a; --panel-2: #3f2b20;
-  /* Slate-grey board. Bonus squares: purples for word squares, oranges/golds for letter squares. */
+  /* Slate-grey board. Bonus squares: purples for word squares, greens for letter squares (clear of the brown tile backs).
+     config.js can override any of these. */
   --frame: #4a4e55; --frame-edge: #2e3136; --cell: #a9adb3; --cell-ink: #3c4046;
-  --tw: #5b3d9a; --dw: #b9a6e6; --tl: #c8641f; --dl: #ecc66a;
-  --tw-ink: #f4eeff; --dw-ink: #2f1d5c; --tl-ink: #fff3e8; --dl-ink: #4f3a07;
+  --tw: #5b3d9a; --dw: #b9a6e6; --tl: #1d8a5c; --dl: #c9e46e;
+  --tw-ink: #f4eeff; --dw-ink: #2f1d5c; --tl-ink: #eafff4; --dl-ink: #2f3d06;
   --tile-1: #dff3ea; --tile-2: #a7d5c3; --tile-ink: #10302a; --tile-edge: #4f8a76; --blank-ink: #b4502a; /* sea-glass tiles, not the classic beige */
   --back-1: #9a6b3e; --back-2: #6e4627; --back-edge: #4a2d17; --back-ink: rgba(255,236,205,.55);
   --ledge-1: #6a4429; --ledge-2: #3e2717;
@@ -139,6 +140,16 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .cell.hover { outline: .4cqw solid var(--accent); outline-offset: -.2cqw; }
 .cell.target { cursor: pointer; }
 .cell.target:hover { filter: brightness(1.12); }
+/* Focus: dim the bonus colours and side panels so only letters and tile backs stand out. */
+body.focus .cell:is(.TW,.DW,.TL,.DL) { background: color-mix(in srgb, var(--cell) calc(100% - var(--focus-bonus, .15) * 100%), var(--pc, var(--cell))); }
+body.focus .cell.TW { --pc: var(--tw); } body.focus .cell.DW { --pc: var(--dw); } body.focus .cell.TL { --pc: var(--tl); } body.focus .cell.DL { --pc: var(--dl); }
+body.focus .cell:is(.TW,.DW,.TL,.DL) { color: color-mix(in srgb, var(--cell-ink) calc(var(--focus-bonus, .15) * 100%), transparent); }
+body.focus .cell.void { opacity: .35; }
+body.focus .tile.down .pm { opacity: var(--focus-bonus, .15); }
+body.focus .board { background: var(--frame-edge); }
+body.focus .side { opacity: var(--focus-side, .45); transition: opacity .2s; }
+body.focus .side:hover, body.focus .side:focus-within { opacity: 1; }
+.zoom-ctl .focus-btn { margin-right: auto; min-width: 0; font-size: 13px; }
 
 .tile { position: absolute; inset: 4%; border-radius: 14%; display: grid; place-items: center;
   background: linear-gradient(150deg, var(--tile-1) 10%, var(--tile-2));
@@ -356,7 +367,8 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
         <div class="turnline" id="turnline"></div>
         <div class="board-wrap">
           <div class="board-view" id="boardView"><div class="board-inner" id="boardInner"><div class="board" id="board"></div></div></div>
-          <div class="zoom-ctl" role="group" aria-label="Board zoom">
+          <div class="zoom-ctl" role="group" aria-label="Board view">
+            <button class="btn small focus-btn" id="focusBtn" type="button" aria-pressed="false" title="Dim everything but the letters and tile backs (F)">Focus</button>
             <button class="btn small" id="zoomOut" type="button" aria-label="Zoom out" disabled>−</button>
             <output id="zoomPct">100%</output>
             <button class="btn small" id="zoomIn" type="button" aria-label="Zoom in">+</button>
@@ -459,16 +471,33 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <div class="feed" id="feed" aria-live="polite"></div>
 <div class="toast" id="toast" hidden></div>
 
+<script src="config.js"></script>
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '8';
+const APP_VERSION = '9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
 
+// ---------- Settings from config.js ----------
+const CFG = (typeof window.RTT_CONFIG === 'object' && window.RTT_CONFIG) || {};
+const cfgNum = (v, d, lo = 0) => Number.isFinite(+v) && v !== '' && v !== null && +v >= lo ? +v : d;
+{
+  const map = { table: '--table', panel: '--panel', text: '--ink', accent: '--accent', board: '--frame', boardEdge: '--frame-edge',
+    square: '--cell', squareText: '--cell-ink', word3: '--tw', word3Text: '--tw-ink', word2: '--dw', word2Text: '--dw-ink',
+    letter3: '--tl', letter3Text: '--tl-ink', letter2: '--dl', letter2Text: '--dl-ink', tile: '--tile-1', tileShade: '--tile-2',
+    tileText: '--tile-ink', tileEdge: '--tile-edge', tileBack: '--back-1', tileBackShade: '--back-2', tileBackEdge: '--back-edge' };
+  const root = document.documentElement.style;
+  for (const [k, v] of Object.entries(CFG.colors || {})) if (map[k] && typeof v === 'string' && CSS.supports('color', v)) root.setProperty(map[k], v);
+  root.setProperty('--focus-bonus', Math.min(1, cfgNum(CFG.focus?.bonusSquares, .15)));
+  root.setProperty('--focus-side', Math.min(1, cfgNum(CFG.focus?.sidePanels, .45)));
+}
+
 // ---------- Rules data ----------
-const VALUES = RSGen.VALUES;
+// Letter values: the game's own, with any changes from config.js (the board generator keeps its own so board codes don't change).
+const VALUES = { ...RSGen.VALUES };
+for (const [ch, v] of Object.entries(CFG.letterValues || {})) if (/^[A-Z]$/.test(ch)) VALUES[ch] = Math.round(cfgNum(v, VALUES[ch]));
 const N = RSGen.N, SIZE = RSGen.SIZE, START = RSGen.START, RACK = 7;
 const PREM = new Array(SIZE).fill('');
 function mark(type, base) {
@@ -483,9 +512,10 @@ mark('DL', [[0,7],[1,4],[2,7],[4,4],[5,7]]);
 // How each bonus square is labelled on the board.
 const PLABEL = { TW: '3W', DW: '2W', TL: '3L', DL: '2L' };
 const SEATS = ['var(--seat-0)','var(--seat-1)','var(--seat-2)','var(--seat-3)'];
-const SWEEP = 50, PEEK_COST = 10, STREAK_STEP = 10;
-const TURN_OPTS = [[0, 'Off'], [30, '30 s'], [60, '1 min'], [90, '90 s'], [120, '2 min']];
-const GAME_OPTS = [[0, 'Off'], [10, '10 min'], [20, '20 min'], [30, '30 min'], [45, '45 min']];
+const SWEEP = cfgNum(CFG.scoring?.cleanSweep, 50), PEEK_COST = cfgNum(CFG.scoring?.peekCost, 10), STREAK_STEP = cfgNum(CFG.scoring?.streakStep, 10);
+const cfgList = (v, d) => { const a = Array.isArray(v) ? [...new Set(v.map(x => Math.round(+x)).filter(x => Number.isFinite(x) && x >= 0))] : []; return a.length ? a : d; };
+const TURN_OPTS = cfgList(CFG.timers?.turnSeconds, [0, 30, 60, 90, 120]).map(s => [s, !s ? 'Off' : s % 60 ? s + ' s' : s / 60 + ' min']);
+const GAME_OPTS = cfgList(CFG.timers?.gameMinutes, [0, 10, 20, 30, 45]).map(m => [m, m ? m + ' min' : 'Off']);
 const letterMult = i => PREM[i] === 'DL' ? 2 : PREM[i] === 'TL' ? 3 : 1;
 const wordMult = i => PREM[i] === 'DW' ? 2 : PREM[i] === 'TW' ? 3 : 1;
 
@@ -513,7 +543,7 @@ const RULES = [
 $('#rulesList').innerHTML = RULES.map(r => `<li>${r}</li>`).join('');
 
 // ---------- Setup ----------
-const prefs = Object.assign({ players: ['Player 1'], board: 'new', words: 'E', turnSec: 60, gameMin: 0, opener: true, firsts: false, notes: true, peek: true, streak: true }, store.get('rtt-prefs') || {});
+const prefs = Object.assign({ players: ['Player 1'], board: 'new', words: 'E', turnSec: cfgNum(CFG.timers?.defaultTurnSeconds, 60), gameMin: 0, opener: true, firsts: false, notes: true, peek: true, streak: true }, store.get('rtt-prefs') || {});
 function savePrefs() { store.set('rtt-prefs', prefs); }
 function renderSetup() {
   $('#playerList').innerHTML = prefs.players.map((n, k) => `
@@ -852,6 +882,15 @@ function showPause() {
   $('#unpauseBtn').focus();
 }
 $('#unpauseBtn').addEventListener('click', () => setPaused(false));
+
+// Focus: dim bonus squares and side panels. Remembered on this device.
+function setFocus(on) {
+  document.body.classList.toggle('focus', on);
+  $('#focusBtn').setAttribute('aria-pressed', on);
+  store.set('rtt-focus', on);
+}
+$('#focusBtn').addEventListener('click', () => setFocus(!document.body.classList.contains('focus')));
+setFocus(!!store.get('rtt-focus'));
 $('#turnline').addEventListener('click', e => { if (e.target.closest('[data-act="pause"]')) setPaused(true); });
 
 // ---------- Clocks ----------
@@ -1336,6 +1375,7 @@ $('#board').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if ((e.key === 'p' || e.key === 'P') && !e.target.closest('input') && G && !G.over && G.phase === 'turn') { setPaused(!G.paused); return; }
+  if ((e.key === 'f' || e.key === 'F') && !e.target.closest('input') && !e.ctrlKey && !e.metaKey) { setFocus(!document.body.classList.contains('focus')); return; }
   if (G?.paused) return;
   if (e.key === 'Escape') { if (S.peekMode || S.swapMode || S.selected) { S.peekMode = false; S.swapMode = false; S.selected = null; render(); } }
   else if (e.key === 'Enter' && G?.phase === 'turn' && S.pend.size && !e.target.closest('button,input')) checkMove();
