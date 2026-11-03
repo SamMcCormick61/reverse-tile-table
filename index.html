@@ -6,6 +6,9 @@
 <title>Reverse Tile Table</title>
 <meta name="description" content="A finished crossword tile game with every tile face down. Work out where your letters went.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='5' fill='%2380bfa9'/%3E%3Ctext x='15' y='23' font-family='sans-serif' font-weight='700' font-size='19' text-anchor='middle' fill='%2310302a'%3E%3F%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2a1a12">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Jost:wght@500;600&display=swap">
@@ -258,6 +261,35 @@ body.view-focus .tile.down .pm { display: none; }
   background: var(--ink); color: var(--table); padding: 10px 16px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px var(--shadow); max-width: calc(100vw - 32px); text-align: center; }
 .foot { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; }
 .foot { margin: 28px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+/* Wide screens (desktop and laptop browsers, landscape tablets): the board fills the window height on the left,
+   and the rack, buttons and scores sit in a column on the right so nothing needs scrolling to play. */
+.keys { display: none; }
+@media (min-width: 1000px) and (min-height: 560px) {
+  .wrap:has(#gameView:not([hidden])) { max-width: 1560px; padding-block: 10px 24px; }
+  .wrap:has(#gameView:not([hidden])) .top { margin-bottom: 10px; }
+  .game { grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto 1fr; column-gap: 28px; row-gap: 14px; }
+  .play-col { display: contents; }
+  .board-wrap { grid-column: 1; grid-row: 1 / span 3; justify-self: center; align-self: start; position: sticky; top: 10px;
+    max-width: min(1000px, max(420px, calc(100dvh - 128px))); }
+  .turnline { grid-column: 2; grid-row: 1; justify-content: flex-start; }
+  .rack-area { grid-column: 2; grid-row: 2; }
+  .side { grid-column: 2; grid-row: 3; }
+  .ledge { --s: 45px; gap: 5px; }
+  .preview { justify-content: flex-start; text-align: left; }
+  .actions { justify-content: flex-start; }
+  .actions .btn { flex: 1 1 auto; }
+  .log { max-height: 220px; }
+  .foot { margin-top: 18px; }
+}
+@media (min-width: 1600px) and (min-height: 860px) {
+  .game { grid-template-columns: minmax(0, 1fr) 430px; }
+  .ledge { --s: 52px; gap: 6px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .keys { display: block; }
+  .keys kbd { font: 600 11px var(--f-tile); padding: 1px 5px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); }
+}
 .foot a { color: var(--accent); }
 .ver { font: 600 11px var(--f-body); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; letter-spacing: .04em; }
 </style>
@@ -347,7 +379,7 @@ body.view-focus .tile.down .pm { display: none; }
         <ol class="rules" id="rulesList"></ol>
       </div>
     </div>
-    <p class="foot">Reverse Tile Table <span id="footVer"></span> · <a href="privacy.html">Privacy policy</a></p>
+    <p class="foot">Reverse Tile Table <span id="footVer"></span> · <a href="privacy.html">Privacy policy</a><span id="installWrap" hidden> · <button class="btn small" id="installBtn" type="button">Install as an app</button></span></p>
   </section>
 
   <!-- Loading -->
@@ -408,6 +440,7 @@ body.view-focus .tile.down .pm { display: none; }
             <span><i style="background:var(--dl)"></i>2L · letter ×2</span>
           </div>
         </div>
+        <p class="small-note keys">Keys: point at a square and type a letter to drop it there · <kbd>Backspace</kbd> takes it back (or right-click a tile) · <kbd>Enter</kbd> checks · <kbd>Esc</kbd> cancels · <kbd>P</kbd> pause · <kbd>F</kbd> board view · <kbd>Ctrl</kbd> + scroll zooms</p>
         <button class="btn warn small" id="quitBtn" type="button">End game</button>
       </aside>
     </div>
@@ -474,10 +507,16 @@ body.view-focus .tile.down .pm { display: none; }
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
+// Installable app (Edge / Chrome on Windows, or any browser that supports it). Not in the Android app, which ships its own files.
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.Capacitor) navigator.serviceWorker.register('sw.js').catch(() => {});
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; $('#installWrap').hidden = false; });
+window.addEventListener('appinstalled', () => { installPrompt = null; $('#installWrap').hidden = true; });
+$('#installBtn').addEventListener('click', async () => { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice.catch(() => {}); installPrompt = null; $('#installWrap').hidden = true; });
 
 // ---------- Settings from config.js ----------
 const CFG = (typeof window.RTT_CONFIG === 'object' && window.RTT_CONFIG) || {};
@@ -686,6 +725,7 @@ function placeTile(id, cell, fromCell) {
   if (fromCell != null) S.pend.delete(fromCell);
   for (const [k, v] of S.pend) if (v.id === id) S.pend.delete(k);
   S.pend.set(cell, { id, ch: tile.ch });
+  placeOrder = placeOrder.filter(k => k !== cell).concat(cell);
   if (prev && fromCell != null && prev.id !== id) S.pend.set(fromCell, prev);
   S.selected = null; render();
 }
@@ -1376,7 +1416,31 @@ $('#board').addEventListener('click', e => {
   if (S.peekMode) { peek(i); return; }
   if (S.selected && G.sol[i] && !G.rev[i] && !S.pend.has(i)) placeTile(S.selected, i, null);
 });
+// Mouse and keyboard: point at a face-down square and type a letter from your rack to drop it there;
+// Backspace or Delete takes back the tile you're pointing at (or the last one put down); right-click a put-down tile to take it back.
+let hoverCell = null, placeOrder = [];
+$('#board').addEventListener('pointerover', e => { if (e.pointerType === 'mouse') hoverCell = e.target.closest('[data-cell]') ? +e.target.closest('[data-cell]').dataset.cell : null; });
+$('#board').addEventListener('pointerleave', () => { hoverCell = null; });
+$('#board').addEventListener('contextmenu', e => {
+  const c = e.target.closest('[data-cell]'); if (!c || !G || G.phase !== 'turn' || !S.pend.has(+c.dataset.cell)) return;
+  e.preventDefault(); S.pend.delete(+c.dataset.cell); render();
+});
+function typeToPlace(e) {
+  if (!G || G.phase !== 'turn' || G.over || S.swapMode || S.peekMode || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input,textarea')) return false;
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    let i = hoverCell != null && S.pend.has(hoverCell) ? hoverCell : null;
+    if (i == null) i = [...placeOrder].reverse().find(k => S.pend.has(k)) ?? [...S.pend.keys()].pop();
+    if (i == null) return false;
+    e.preventDefault(); S.pend.delete(i); render(); return true;
+  }
+  if (!/^[a-z]$/i.test(e.key) || hoverCell == null || !G.sol[hoverCell] || G.rev[hoverCell]) return false;
+  const ch = e.key.toUpperCase(), used = new Set([...S.pend.values()].map(t => t.id));
+  const t = cur().rack.find(x => x.ch === ch && !used.has(x.id)) || (S.pend.get(hoverCell)?.ch === ch ? null : undefined);
+  if (!t) return t === null; // the same letter is already there: nothing to do
+  e.preventDefault(); placeTile(t.id, hoverCell, null); return true;
+}
 document.addEventListener('keydown', e => {
+  if (!G?.paused && typeToPlace(e)) return;
   if ((e.key === 'p' || e.key === 'P') && !e.target.closest('input') && G && !G.over && G.phase === 'turn') { setPaused(!G.paused); return; }
   if (G?.paused) return;
   if ((e.key === 'f' || e.key === 'F') && !e.target.closest('input') && !e.ctrlKey && !e.metaKey) { nextView(); return; }
@@ -1434,7 +1498,7 @@ function renderRack() {
     let pot = 0; for (const [i, t] of S.pend) pot += VALUES[t.ch] * letterMult(i);
     pv.innerHTML = `<span class="muted">${S.pend.size} tile${S.pend.size > 1 ? 's' : ''} down. All right would be at least <b style="color:var(--ink)">${pot * S.pend.size}</b>; each wrong one costs its value.</span>`;
   } else if (S.selected) pv.innerHTML = '<span class="muted">Tap a face-down tile to put your letter there, or drag it.</span>';
-  else pv.innerHTML = G.phase === 'turn' ? '<span class="muted">Drag or tap your tiles onto face-down squares where you think they were played.</span>' : '';
+  else pv.innerHTML = G.phase === 'turn' ? `<span class="muted">${matchMedia('(hover: hover) and (pointer: fine)').matches ? 'Drag your tiles onto face-down squares where you think they were played, or point at a square and type the letter.' : 'Drag or tap your tiles onto face-down squares where you think they were played.'}</span>` : '';
 
   const a = $('#actions');
   if (G.over || G.phase !== 'turn') { a.innerHTML = G.over && hiddenCount() ? `<button class="btn" type="button" data-act="toggleAll">${S.showAll ? 'Hide unfound tiles' : 'Show the full board'}</button>` : ''; return; }

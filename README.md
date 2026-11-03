@@ -49,6 +49,14 @@ This game's board, bag and values are its own:
 - Bonus colours: **3W** deep purple, **2W** lilac, **3L** emerald, **2L** lime.
 - Letter values: A E I N O R S T 1 · D L U 2 · C G H M P Y 3 · B F V W 5 · K 6 · X 8 · J Q Z 9. No letter is worth 4 or 10.
 
+### On a Windows PC (or any desktop browser)
+
+Open the link above in Edge or Chrome. On a wide window the board fills the height of the screen, with your rack, the buttons and the scores in a column on the right.
+
+- **Mouse:** drag tiles onto the board, or click a tile then click a square. Right-click a tile you've put down to take it back. Ctrl + scroll wheel zooms the board.
+- **Keyboard:** point at a face-down square and type a letter from your rack to drop it there. **Backspace** takes back the tile you're pointing at (or the last one), **Enter** checks, **Esc** cancels, **P** pauses, **F** switches the board view.
+- **Install it as an app:** press **Install as an app** at the bottom of the start screen (or the install icon in the address bar). It then opens in its own window from the Start menu, and plays offline (online racing still needs the internet).
+
 Play solo, or pass one device around for 2 to 4 players. Your game is saved in the browser, so a reload picks up where you left off.
 
 ### Online racing (2 to 4 players)
