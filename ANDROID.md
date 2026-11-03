@@ -72,7 +72,7 @@ Everything here is already in the repo:
 
 **Full description**:
 
-> The game is over. All 100 tiles are on the board, but every one of them is face down.
+> The game is over. All 112 tiles are on a 16 × 16 board, but every one of them is face down.
 >
 > Draw seven letters and put each one back where you think it was played. Get it right and the tile flips face up and scores. Get it wrong and it costs you. The more you get right in one turn, the bigger the multiplier, and finishing a whole word scores the whole word, bonus squares and all.
 >
