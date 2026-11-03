@@ -22,6 +22,7 @@ A crossword tile game played backwards. A full game has already been played to t
 - **Show first letters**: the first letter of every word starts face up. Easier and quicker.
 - **Mark wrong guesses**: letters already tried on a square are crossed out on it.
 - **Peek**: once a turn, pay 10 points to flip any tile.
+- **Secret reveals**: every player gets 3 free tokens. Tap **Reveal**, then any face-down tile, to see its letter yourself. The tile stays face down and the other players only see a black border on it, so they know someone has looked but not what's there. In pass-and-play your revealed letters only show during your own turn.
 - **Hot streaks**: back-to-back turns with no wrong tiles earn +10, +20, +30…
 - **Pause**: the Pause button (or the P key) stops both clocks and covers the board and rack until you resume. A paused game survives closing the page.
 - **Swap**: put tiles back in the bag and draw new ones instead of guessing. It costs the value of every tile you swap and ends your turn.
@@ -78,7 +79,7 @@ Open `config.js`, change a value, save, and reload the game. You can change:
 
 - **colors**: the table, the board, every bonus square and its label, face-up tiles and tile backs. Any CSS colour works (`'#3a7bd5'`, `'teal'`).
 - **letterValues**: points for any letter, e.g. `{ Q: 8 }`. The board generator keeps the built-in values, so board codes still make the same boards.
-- **scoring**: clean sweep bonus, peek cost, hot streak step.
+- **scoring**: clean sweep bonus, peek cost, hot streak step, number of secret reveals.
 - **timers**: the turn timer and game clock choices on the setup screen, and the default turn time.
 - **board.defaultView**: which Focus view a new device starts on (`'standard'`, `'focus'` or `'all'`).
 

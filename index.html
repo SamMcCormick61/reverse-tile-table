@@ -173,6 +173,9 @@ body.view-focus .tile.down .pm { display: none; }
 .tile.wrong { background: linear-gradient(150deg, #ffd8cf, #f2a797); box-shadow: inset 0 -.45cqw 0 #b55a48, 0 0 0 .45cqw var(--bad); }
 .tile.wrong b { text-decoration: line-through; }
 .tile.unfound { opacity: .55; filter: saturate(.4); }
+/* Secret reveal: a black border for everyone; the player who used the token also sees the letter. */
+.tile.down.spied { box-shadow: inset 0 0 0 .5cqw #0b0b0b, inset 0 -.45cqw 0 var(--back-edge), 0 .35cqw .55cqw var(--shadow); }
+.tile.down .spy { position: absolute; inset: 22% 0 0; display: grid; place-items: center; font: 600 3.2cqw/1 var(--f-tile); color: #fff4e0; text-shadow: 0 .15cqw .3cqw rgba(0,0,0,.6); }
 .tile.peek { box-shadow: inset 0 -.45cqw 0 var(--tile-edge), 0 0 0 .45cqw var(--seat-3), 0 .35cqw .55cqw var(--shadow); }
 @media (prefers-reduced-motion: no-preference) {
   .tile.fresh { animation: turn .45s ease-out; }
@@ -548,6 +551,7 @@ mark('DL', [[0,7],[1,4],[2,7],[4,4],[5,7]]);
 // How each bonus square is labelled on the board.
 const PLABEL = { TW: '3W', DW: '2W', TL: '3L', DL: '2L' };
 const SEATS = ['var(--seat-0)','var(--seat-1)','var(--seat-2)','var(--seat-3)'];
+const REVEALS = Math.max(0, Math.round(cfgNum(CFG.scoring?.revealTokens, 3)));
 const SWEEP = cfgNum(CFG.scoring?.cleanSweep, 50), PEEK_COST = cfgNum(CFG.scoring?.peekCost, 10), STREAK_STEP = cfgNum(CFG.scoring?.streakStep, 10);
 const cfgList = (v, d) => { const a = Array.isArray(v) ? [...new Set(v.map(x => Math.round(+x)).filter(x => Number.isFinite(x) && x >= 0))] : []; return a.length ? a : d; };
 const TURN_OPTS = cfgList(CFG.timers?.turnSeconds, [0, 30, 60, 90, 120]).map(s => [s, !s ? 'Off' : s % 60 ? s + ' s' : s / 60 + ' min']);
@@ -572,6 +576,7 @@ const RULES = [
   `Turn the last face-down tile of a word and you also score the <b>whole word</b>, with double and triple word squares you covered that turn.`,
   `All seven right in one turn is a <b>clean sweep</b>: +${SWEEP}. With hot streaks on, each perfect turn after another earns +${STREAK_STEP}, +${STREAK_STEP * 2}, and so on.`,
   `Tiles played as blanks in the finished game start face up as free clues. With <b>Show first letters</b> on, so does the first letter of every word.`,
+  `Everyone gets <b>${REVEALS} secret reveals</b>. Use one on any face-down tile to see its letter yourself. It stays face down, and the other players only see a black border on it. It's free and doesn't end your turn.`,
   `<b>Swapping</b> puts tiles back in the bag and draws new ones, but costs the value of every tile you swap and ends your turn.`,
   `The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on your rack then count against you.`,
   `<b>Online</b>, there are no turns. Everyone places tiles and presses Check whenever they like, with a 2-second wait between Checks. If someone flips a square first, your tile on it goes back on your rack at no cost. Peeks have no once-a-turn limit, and the game clock is the only timer.`,
@@ -647,7 +652,7 @@ function makeBoard(mode, seed) {
 // ---------- Game state ----------
 // G is the whole game and is saved after every change, so a reload picks up where you left off.
 let G = null;
-const S = { selected: null, pend: new Map(), swapMode: false, swapSel: new Set(), peekMode: false, flash: new Map(), fresh: new Set(), showAll: false };
+const S = { selected: null, pend: new Map(), swapMode: false, swapSel: new Set(), peekMode: false, spyMode: false, flash: new Map(), fresh: new Set(), showAll: false };
 const save = () => G && !isGuest() && store.set('rtt-game', G);
 const bagCount = () => G.bagN ?? G.bag.length;
 const cur = () => G.players[G.cur];
@@ -676,7 +681,8 @@ async function startGame(code, again, net) {
   const names = net ? net.map(x => x.name) : prefs.players.map((n, k) => (n || '').trim() || 'Player ' + (k + 1));
   G = {
     v: APP_VERSION, code: p.mode + p.seed, sol, rev: new Array(SIZE).fill(0), notes: {}, bag: [],
-    players: names.map((name, k) => ({ name, cid: net?.[k].cid, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0 })),
+    players: names.map((name, k) => ({ name, cid: net?.[k].cid, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0, tokens: REVEALS })),
+    spy: {},
     online: !!net, room: net ? NET.room : null,
     cur: 0, turn: 1, passes: 0, log: [], over: false, endReason: '',
     opts: { turnSec: net ? 0 : prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, firsts: prefs.firsts, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
@@ -701,7 +707,7 @@ function refill(pl) { while (pl.rack.length < RACK && G.bag.length) pl.rack.push
 function hiddenCount() { let n = 0; for (let i = 0; i < SIZE; i++) if (G.sol[i] && !G.rev[i]) n++; return n; }
 function totalTiles() { return G.sol.filter(Boolean).length; }
 
-function resetTurnUI() { S.selected = null; S.pend = new Map(); S.swapMode = false; S.swapSel = new Set(); S.peekMode = false; }
+function resetTurnUI() { S.selected = null; S.pend = new Map(); S.swapMode = false; S.swapSel = new Set(); S.peekMode = false; S.spyMode = false; }
 
 function beginTurnPrompt() {
   resetTurnUI();
@@ -834,6 +840,26 @@ function swapTiles(k, ids) {
   p.score -= cost;
   G.log.push({ who: k, text: `Swapped ${back.map(t => '<b>' + t.ch + '</b>').join(' ')}`, n: -cost });
   return cost;
+}
+
+// Secret reveal: player k sees cell i's letter; everyone else only sees that someone looked.
+const tokensLeft = p => p.tokens ?? REVEALS;
+const spiedBy = i => (G.spy || {})[i] || [];
+function spy(i) {
+  if (!G.sol[i] || G.rev[i]) return;
+  S.spyMode = false;
+  if (spiedBy(i).includes(G.cur)) { render(); return; }
+  if (!tokensLeft(cur())) { toast('You have no secret reveals left.'); render(); return; }
+  if (G.online) return netSpy(i);
+  spyTile(G.cur, i); save(); render();
+}
+function spyTile(k, i) {
+  const p = G.players[k];
+  if (!G.sol[i] || G.rev[i] || !tokensLeft(p) || spiedBy(i).includes(k)) return false;
+  p.tokens = tokensLeft(p) - 1;
+  G.spy = G.spy || {}; G.spy[i] = [...spiedBy(i), k];
+  G.log.push({ who: k, text: 'Used a secret reveal' });
+  return true;
 }
 
 // Peek: pay to flip one tile. Its letter leaves the bag (or a rack, if every copy has been drawn).
@@ -1096,6 +1122,7 @@ function hostRecv(conn, d) {
   if (d.t === 'check') hostCheck(k, d.place);
   else if (d.t === 'swap') hostSwap(k, d.ids);
   else if (d.t === 'peek') hostPeek(k, d.i);
+  else if (d.t === 'spy') { if (spyTile(k, d.i)) netSend({ who: k, total: 0, spy: true }); }
 }
 function hostDrop(conn, left) {
   if (!conn.cid || NET.conns.get(conn.cid) !== conn) return;
@@ -1255,6 +1282,10 @@ function netSwap(ids) {
   if (isGuest()) send(NET.conn, { t: 'swap', ids }); else hostSwap(G.cur, ids);
   render();
 }
+function netSpy(i) {
+  if (isGuest()) send(NET.conn, { t: 'spy', i }); else if (spyTile(G.cur, i)) netSend({ who: G.cur, total: 0, spy: true });
+  render();
+}
 function netPeek(i) {
   S.peekMode = false;
   if (isGuest()) send(NET.conn, { t: 'peek', i }); else hostPeek(G.cur, i);
@@ -1280,7 +1311,7 @@ function netShowEvent(ev) {
     if (ev.wrong?.length) setTimeout(() => { for (const [i] of ev.wrong) S.flash.delete(i); G && render(); }, 1600);
   } else for (const [i, ch] of ev.wrong || []) { S.flash.set(i, ch); setTimeout(() => { S.flash.delete(i); G && render(); }, 1600); }
   const p = G.players[ev.who]; if (!p) return;
-  const what = ev.swap ? `swapped ${ev.swap}` : ev.peek != null ? 'peeked' : ev.words?.length ? `finished <b>${ev.words.map(esc).join(', ')}</b>` : `${ev.right.length}✓ ${ev.wrong.length}✕`;
+  const what = ev.swap ? `swapped ${ev.swap}` : ev.peek != null ? 'peeked' : ev.spy ? 'used a secret reveal' : ev.words?.length ? `finished <b>${ev.words.map(esc).join(', ')}</b>` : `${ev.right.length}✓ ${ev.wrong.length}✕`;
   const el = document.createElement('div');
   el.innerHTML = `<span class="dot" style="background:${SEATS[ev.who]}"></span><span>${esc(p.name)} ${what}</span><span class="n ${ev.total < 0 ? 'neg' : ev.total > 0 ? 'pos' : ''}">${ev.total > 0 ? '+' : ''}${ev.total}</span>`;
   const feed = $('#feed'); feed.prepend(el);
@@ -1293,6 +1324,7 @@ function netActions() {
   return `
     <button class="btn" type="button" data-act="recall" ${S.pend.size ? '' : 'disabled'}>Recall</button>
     <button class="btn" type="button" data-act="shuffle">Shuffle</button>
+    ${spyBtn()}
     ${G.opts.peek ? `<button class="btn" type="button" data-act="peek" aria-pressed="${S.peekMode}">Peek −${PEEK_COST}</button>` : ''}
     <button class="btn" type="button" data-act="swap" ${bagCount() && !S.pend.size ? '' : 'disabled'}>Swap</button>
     <button class="btn primary" type="button" data-act="check" ${S.pend.size && !S.waiting && !cool ? '' : 'disabled'}>${S.waiting ? 'Checking…' : 'Check'}</button>`;
@@ -1414,6 +1446,7 @@ $('#board').addEventListener('click', e => {
   const c = e.target.closest('[data-cell]'); if (!c || !G || G.phase !== 'turn') return;
   const i = +c.dataset.cell;
   if (S.peekMode) { peek(i); return; }
+  if (S.spyMode) { spy(i); return; }
   if (S.selected && G.sol[i] && !G.rev[i] && !S.pend.has(i)) placeTile(S.selected, i, null);
 });
 // Mouse and keyboard: point at a face-down square and type a letter from your rack to drop it there;
@@ -1444,7 +1477,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'p' || e.key === 'P') && !e.target.closest('input') && G && !G.over && G.phase === 'turn') { setPaused(!G.paused); return; }
   if (G?.paused) return;
   if ((e.key === 'f' || e.key === 'F') && !e.target.closest('input') && !e.ctrlKey && !e.metaKey) { nextView(); return; }
-  if (e.key === 'Escape') { if (S.peekMode || S.swapMode || S.selected) { S.peekMode = false; S.swapMode = false; S.selected = null; render(); } }
+  if (e.key === 'Escape') { if (S.peekMode || S.spyMode || S.swapMode || S.selected) { S.peekMode = false; S.spyMode = false; S.swapMode = false; S.selected = null; render(); } }
   else if (e.key === 'Enter' && G?.phase === 'turn' && S.pend.size && !e.target.closest('button,input')) checkMove();
 });
 
@@ -1457,7 +1490,8 @@ function rtileHTML(ch, cls, attrs) {
   return `<button type="button" class="rtile${cls}" ${attrs}>${ch}<i>${VALUES[ch]}</i></button>`;
 }
 function renderBoard() {
-  const targeting = G.phase === 'turn' && (S.selected || S.peekMode);
+  const targeting = G.phase === 'turn' && (S.selected || S.peekMode || S.spyMode);
+  // A player's own secret reveals only show while it's their turn on screen (never on the pass screen).
   let html = '';
   for (let i = 0; i < SIZE; i++) {
     const prem = PREM[i], s = G.sol[i], p = S.pend.get(i);
@@ -1473,7 +1507,8 @@ function renderBoard() {
     else if (p) inner = tileHTML(p.ch, ' pending', `data-tile-id="${p.id}" data-src="board" role="button" tabindex="0" aria-label="Pick up ${p.ch}"`);
     else {
       const nots = G.opts.notes && G.notes[i] ? `<span class="nots" aria-label="Not ${G.notes[i].split('').join(', ')}">${G.notes[i]}</span>` : '';
-      inner = `<span class="tile down">${prem ? `<span class="pm ${prem}">${PLABEL[prem]}</span>` : ''}${nots}</span>`;
+      const who = spiedBy(i), mine = G.phase === 'turn' && !G.over && who.includes(G.cur);
+      inner = `<span class="tile down${who.length ? ' spied' : ''}"${who.length ? ` aria-label="${mine ? 'You revealed ' + s.ch : 'Secretly revealed by another player'}"` : ''}>${prem ? `<span class="pm ${prem}">${PLABEL[prem]}</span>` : ''}${nots}${mine ? `<span class="spy">${s.blank ? '' : s.ch}</span>` : ''}</span>`;
       if (targeting) cls += ' target';
     }
     html += `<div class="${cls}" data-cell="${i}">${inner}</div>`;
@@ -1493,6 +1528,7 @@ function renderRack() {
   const pv = $('#preview');
   if (G.over) pv.innerHTML = '';
   else if (S.swapMode) pv.innerHTML = `<span class="muted">Tap the tiles to put back in the bag (${S.swapSel.size} chosen, costs ${[...S.swapSel].reduce((n, id) => n + (VALUES[rackTile(id)?.ch] || 0), 0)} points). Swapping ends your turn.</span>`;
+  else if (S.spyMode) pv.innerHTML = `<span class="muted">Tap any face-down tile to see its letter. Only you will see it; the others just see a black border. ${tokensLeft(cur())} left.</span>`;
   else if (S.peekMode) pv.innerHTML = `<span class="muted">Tap any face-down tile to flip it for ${PEEK_COST} points.</span>`;
   else if (S.pend.size) {
     let pot = 0; for (const [i, t] of S.pend) pot += VALUES[t.ch] * letterMult(i);
@@ -1512,6 +1548,7 @@ function renderRack() {
   a.innerHTML = `
     <button class="btn" type="button" data-act="recall" ${S.pend.size ? '' : 'disabled'}>Recall</button>
     <button class="btn" type="button" data-act="shuffle">Shuffle</button>
+    ${spyBtn()}
     ${G.opts.peek ? `<button class="btn" type="button" data-act="peek" aria-pressed="${S.peekMode}" ${canPeek ? '' : 'disabled'}>Peek −${PEEK_COST}</button>` : ''}
     <button class="btn" type="button" data-act="swap" ${G.bag.length && !S.pend.size ? '' : 'disabled'}>Swap</button>
     <button class="btn" type="button" data-act="pass">Pass</button>
@@ -1524,7 +1561,8 @@ $('#actions').addEventListener('click', e => {
   if (G.phase !== 'turn') return;
   if (act === 'recall') { S.pend = new Map(); S.selected = null; }
   else if (act === 'shuffle') shuffle(cur().rack);
-  else if (act === 'peek') { S.peekMode = !S.peekMode; S.selected = null; }
+  else if (act === 'peek') { S.peekMode = !S.peekMode; S.spyMode = false; S.selected = null; }
+  else if (act === 'spy') { S.spyMode = !S.spyMode; S.peekMode = false; S.selected = null; }
   else if (act === 'swap') { S.pend = new Map(); S.swapMode = true; S.swapSel = new Set(); S.selected = null; }
   else if (act === 'swapCancel') { S.swapMode = false; S.swapSel = new Set(); }
   else if (act === 'swapGo') return doSwap();
@@ -1533,6 +1571,11 @@ $('#actions').addEventListener('click', e => {
   render();
 });
 
+function spyBtn() {
+  if (!REVEALS) return '';
+  const n = tokensLeft(cur());
+  return `<button class="btn" type="button" data-act="spy" aria-pressed="${S.spyMode}" ${n ? '' : 'disabled'}>Reveal ×${n}</button>`;
+}
 function renderClocks() {
   const tl = $('#turnline');
   const p = cur();
@@ -1548,7 +1591,7 @@ function renderClocks() {
 function renderSide() {
   $('#scores').innerHTML = G.players.map((p, k) => `<div class="score${k === G.cur && !G.over ? ' now' : ''}${p.off ? ' off' : ''}">
     <span class="dot" style="background:${SEATS[k]}"></span>
-    <span class="nm"><strong>${esc(p.name)}${G.online && k === G.cur ? ' (you)' : ''}</strong><span>${p.right} right · ${p.wrong} wrong${p.streak >= 2 ? ` · 🔥 ${p.streak}` : ''}${G.online && !G.over ? ` · ${p.off ? 'offline' : (p.held ?? p.rack.length) + ' tiles'}` : ''}</span></span>
+    <span class="nm"><strong>${esc(p.name)}${G.online && k === G.cur ? ' (you)' : ''}</strong><span>${p.right} right · ${p.wrong} wrong${p.streak >= 2 ? ` · 🔥 ${p.streak}` : ''}${REVEALS && !G.over ? ` · ${tokensLeft(p)} reveal${tokensLeft(p) === 1 ? '' : 's'}` : ''}${G.online && !G.over ? ` · ${p.off ? 'offline' : (p.held ?? p.rack.length) + ' tiles'}` : ''}</span></span>
     <span class="pts">${p.score}</span></div>`).join('');
   const total = totalTiles(), found = total - hiddenCount();
   $('#foundN').textContent = `${found} / ${total}`;
