@@ -19,7 +19,7 @@ window.RTT_CONFIG = {
     square: '#a9adb3',          // plain squares
     squareText: '#3c4046',
 
-    // Bonus squares (background, then label colour)
+    // Bonus squares (background, then label colour), used for the tile badges and the 'all' view
     word3: '#5b3d9a',   word3Text: '#f4eeff',    // 3W
     word2: '#b9a6e6',   word2Text: '#2f1d5c',    // 2W
     letter3: '#1d8a5c', letter3Text: '#eafff4',  // 3L
@@ -53,9 +53,11 @@ window.RTT_CONFIG = {
     gameMinutes: [0, 10, 20, 30, 45],     // game clock choices (0 = off)
   },
 
-  // The Focus button dims the board so only the letters and tile backs stand out.
-  focus: {
-    bonusSquares: 0.15,         // how visible bonus colours and labels stay (0 = hidden, 1 = normal)
-    sidePanels: 0.45,           // how visible the side panels stay
+  board: {
+    // Which view the Focus button starts on, the first time the game is opened on a device:
+    //   'standard' - plain dark-grey empty squares, with a 2L/3L/2W/3W badge on tiles that sit on a bonus square
+    //   'focus'    - the same, without the badges
+    //   'all'      - every bonus square coloured and labelled, as a map of the board
+    defaultView: 'standard',
   },
 };

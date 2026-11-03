@@ -140,16 +140,15 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .cell.hover { outline: .4cqw solid var(--accent); outline-offset: -.2cqw; }
 .cell.target { cursor: pointer; }
 .cell.target:hover { filter: brightness(1.12); }
-/* Focus: dim the bonus colours and side panels so only letters and tile backs stand out. */
-body.focus .cell:is(.TW,.DW,.TL,.DL) { background: color-mix(in srgb, var(--cell) calc(100% - var(--focus-bonus, .15) * 100%), var(--pc, var(--cell))); }
-body.focus .cell.TW { --pc: var(--tw); } body.focus .cell.DW { --pc: var(--dw); } body.focus .cell.TL { --pc: var(--tl); } body.focus .cell.DL { --pc: var(--dl); }
-body.focus .cell:is(.TW,.DW,.TL,.DL) { color: color-mix(in srgb, var(--cell-ink) calc(var(--focus-bonus, .15) * 100%), transparent); }
-body.focus .cell.void { opacity: .35; }
-body.focus .tile.down .pm { opacity: var(--focus-bonus, .15); }
-body.focus .board { background: var(--frame-edge); }
-body.focus .side { opacity: var(--focus-side, .45); transition: opacity .2s; }
-body.focus .side:hover, body.focus .side:focus-within { opacity: 1; }
-.zoom-ctl .focus-btn { margin-right: auto; min-width: 0; font-size: 13px; }
+/* Board views, picked with the View button (body.view-*):
+   standard - empty squares plain dark grey; face-down tiles show their 2L/3L/2W/3W badge
+   focus    - as standard, but the badges on tiles are hidden too
+   all      - every bonus square is coloured and labelled, as a reference map */
+body:not(.view-all) .cell:is(.TW,.DW,.TL,.DL) { background: var(--cell); color: transparent; }
+body:not(.view-all) .cell.void { opacity: .35; }
+body:not(.view-all) .board { background: var(--frame-edge); }
+body.view-focus .tile.down .pm { display: none; }
+.zoom-ctl .view-btn { margin-right: auto; min-width: 0; font-size: 13px; }
 
 .tile { position: absolute; inset: 4%; border-radius: 14%; display: grid; place-items: center;
   background: linear-gradient(150deg, var(--tile-1) 10%, var(--tile-2));
@@ -368,7 +367,7 @@ body.focus .side:hover, body.focus .side:focus-within { opacity: 1; }
         <div class="board-wrap">
           <div class="board-view" id="boardView"><div class="board-inner" id="boardInner"><div class="board" id="board"></div></div></div>
           <div class="zoom-ctl" role="group" aria-label="Board view">
-            <button class="btn small focus-btn" id="focusBtn" type="button" aria-pressed="false" title="Dim everything but the letters and tile backs (F)">Focus</button>
+            <button class="btn small view-btn" id="viewBtn" type="button" title="Switch board view (F)"></button>
             <button class="btn small" id="zoomOut" type="button" aria-label="Zoom out" disabled>−</button>
             <output id="zoomPct">100%</output>
             <button class="btn small" id="zoomIn" type="button" aria-label="Zoom in">+</button>
@@ -475,7 +474,7 @@ body.focus .side:hover, body.focus .side:focus-within { opacity: 1; }
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
@@ -490,8 +489,6 @@ const cfgNum = (v, d, lo = 0) => Number.isFinite(+v) && v !== '' && v !== null &
     tileText: '--tile-ink', tileEdge: '--tile-edge', tileBack: '--back-1', tileBackShade: '--back-2', tileBackEdge: '--back-edge' };
   const root = document.documentElement.style;
   for (const [k, v] of Object.entries(CFG.colors || {})) if (map[k] && typeof v === 'string' && CSS.supports('color', v)) root.setProperty(map[k], v);
-  root.setProperty('--focus-bonus', Math.min(1, cfgNum(CFG.focus?.bonusSquares, .15)));
-  root.setProperty('--focus-side', Math.min(1, cfgNum(CFG.focus?.sidePanels, .45)));
 }
 
 // ---------- Rules data ----------
@@ -529,7 +526,7 @@ const store = {
 };
 
 const RULES = [
-  `Every square with a tile on it is a <b>face-down tile</b>. You can see the shape of the finished game and the bonus squares, but not the letters.`,
+  `Every square with a tile on it is a <b>face-down tile</b>. You can see the shape of the finished game and a badge on each tile that sits on a bonus square, but not the letters. The <b>Focus</b> button under the board switches between that view, a plainer one with no badges, and a map of every bonus square.`,
   `Each turn, put any number of your seven tiles on face-down squares, anywhere on the board. Press <b>Check</b> to flip them.`,
   `A <b>correct</b> tile stays face up and scores its letter value, doubled or tripled on a letter bonus square. Your letter points are then <b>multiplied by how many tiles you got right</b> that turn.`,
   `A <b>wrong</b> tile costs its letter value (at least 1) and goes back in the bag.`,
@@ -883,14 +880,20 @@ function showPause() {
 }
 $('#unpauseBtn').addEventListener('click', () => setPaused(false));
 
-// Focus: dim bonus squares and side panels. Remembered on this device.
-function setFocus(on) {
-  document.body.classList.toggle('focus', on);
-  $('#focusBtn').setAttribute('aria-pressed', on);
-  store.set('rtt-focus', on);
+// Board view: standard (tile badges), focus (no badges), all (every bonus square shown). Remembered on this device.
+const VIEWS = { standard: 'Focus: off', focus: 'Focus: on', all: 'Focus: show bonuses' };
+function setView(v) {
+  if (!VIEWS[v]) v = 'standard';
+  for (const k of Object.keys(VIEWS)) document.body.classList.toggle('view-' + k, k === v);
+  $('#viewBtn').textContent = VIEWS[v];
+  $('#viewBtn').setAttribute('aria-pressed', v !== 'standard');
+  $('#viewBtn').dataset.view = v;
+  store.set('rtt-view', v);
 }
-$('#focusBtn').addEventListener('click', () => setFocus(!document.body.classList.contains('focus')));
-setFocus(!!store.get('rtt-focus'));
+const nextView = () => { const k = Object.keys(VIEWS); setView(k[(k.indexOf($('#viewBtn').dataset.view) + 1) % k.length]); };
+$('#viewBtn').addEventListener('click', nextView);
+setView(store.get('rtt-view') || CFG.board?.defaultView || 'standard');
+
 $('#turnline').addEventListener('click', e => { if (e.target.closest('[data-act="pause"]')) setPaused(true); });
 
 // ---------- Clocks ----------
@@ -1375,8 +1378,8 @@ $('#board').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if ((e.key === 'p' || e.key === 'P') && !e.target.closest('input') && G && !G.over && G.phase === 'turn') { setPaused(!G.paused); return; }
-  if ((e.key === 'f' || e.key === 'F') && !e.target.closest('input') && !e.ctrlKey && !e.metaKey) { setFocus(!document.body.classList.contains('focus')); return; }
   if (G?.paused) return;
+  if ((e.key === 'f' || e.key === 'F') && !e.target.closest('input') && !e.ctrlKey && !e.metaKey) { nextView(); return; }
   if (e.key === 'Escape') { if (S.peekMode || S.swapMode || S.selected) { S.peekMode = false; S.swapMode = false; S.selected = null; render(); } }
   else if (e.key === 'Enter' && G?.phase === 'turn' && S.pend.size && !e.target.closest('button,input')) checkMove();
 });
