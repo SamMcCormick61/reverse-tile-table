@@ -1,10 +1,15 @@
 // Board generator: plays out a full finished crossword tile game so every tile in the bag ends up on the board.
 // Works in the browser (window.RSGen) and in Node (module.exports) so it can be tested from the command line.
 (function (root) {
-  const N = 15, CENTER = 112;
-  // This game's own 100-tile bag: counts follow English letter frequency, values how hard a letter is to use.
-  const COUNTS = {A:9,B:2,C:3,D:4,E:11,F:2,G:3,H:3,I:8,J:1,K:1,L:4,M:2,N:6,O:7,P:2,Q:1,R:6,S:5,T:7,U:3,V:2,W:2,X:1,Y:2,Z:1,'?':2};
-  const VALUES = {A:1,B:4,C:3,D:2,E:1,F:4,G:3,H:3,I:1,J:9,K:6,L:2,M:3,N:1,O:1,P:3,Q:10,R:1,S:1,T:1,U:2,V:5,W:4,X:8,Y:3,Z:10,'?':0};
+  // 16 x 16 board. With an even size there is no single middle square, so the opening word must cover
+  // at least one of the four squares in the middle (START).
+  const N = 16, SIZE = N * N, M = N / 2;
+  const START = [(M - 1) * N + M - 1, (M - 1) * N + M, M * N + M - 1, M * N + M];
+  // This game's own 112-tile bag (seven per row of the board): counts follow English letter frequency,
+  // values how hard a letter is to use. No letter is worth 4 or 10.
+  const COUNTS = {A:10,B:2,C:3,D:5,E:12,F:2,G:3,H:4,I:9,J:1,K:1,L:5,M:2,N:7,O:8,P:2,Q:1,R:7,S:6,T:8,U:4,V:2,W:2,X:1,Y:2,Z:1,'?':2};
+  const VALUES = {A:1,B:5,C:3,D:2,E:1,F:5,G:3,H:3,I:1,J:9,K:6,L:2,M:3,N:1,O:1,P:3,Q:9,R:1,S:1,T:1,U:2,V:5,W:5,X:8,Y:3,Z:9,'?':0};
+  const TOTAL = Object.values(COUNTS).reduce((a, b) => a + b, 0);
   const A = 65;
 
   function makeRng(seed) {
@@ -25,10 +30,10 @@
     const rng = makeRng(opts.seed ?? Math.floor(Math.random() * 2 ** 31));
     const main = opts.main, cross = opts.cross || opts.main, fallback = opts.fallback || null;
     const pick = arr => arr[Math.floor(rng() * arr.length)];
-    const board = new Array(225).fill(null); // {ch, blank, turn}
+    const board = new Array(SIZE).fill(null); // {ch, blank, turn}
     const pool = new Array(27).fill(0); // 26 = blank
     for (const [ch, n] of Object.entries(COUNTS)) pool[ch === '?' ? 26 : ch.charCodeAt(0) - A] += n;
-    let left = 100, turn = 0;
+    let left = TOTAL, turn = 0;
     const words = []; // {word, cells, dir, turn}
 
     const at = (r, c) => (r < 0 || c < 0 || r >= N || c >= N) ? null : board[r * N + c];
@@ -59,13 +64,13 @@
           s += l; pr += dc; pc += dr;
         }
         if (hasCross) { if (!cross.set.has(s) && !(fallback && fallback.set.has(s) && s.length <= 3)) return null; touches = true; }
-        if (first && rr * N + cc === CENTER) touches = true;
+        if (first && START.includes(rr * N + cc)) touches = true;
         fresh.push({ i: rr * N + cc, ch, blank });
       }
       if (!fresh.length || fresh.length > 7) return null; // a real turn never lays more than a rack's worth
       if (hits) touches = true;
       if (!touches) return null;
-      if (first && !fresh.some(f => f.i === CENTER)) return null;
+      if (first && !fresh.some(f => START.includes(f.i))) return null;
       if (!dict.set.has(w)) return null;
       return { w, r, c, d, fresh };
     }
@@ -94,20 +99,21 @@
       return miss <= extra;
     }
 
-    // Opening move through the center.
+    // Opening move through the middle.
     {
       const opts1 = main.list.filter(w => w.length >= 5 && w.length <= 7 && poolHas(w, 0));
       let plan = null;
       for (let t = 0; t < 200 && !plan; t++) {
         const w = pick(opts1), d = rng() < .5 ? 0 : 1, off = Math.floor(rng() * w.length);
-        plan = tryPlace(w, d ? 7 - off : 7, d ? 7 : 7 - off, d, main, false, true);
+        const line = M - (rng() < .5 ? 1 : 0); // which of the two middle rows/columns
+        plan = tryPlace(w, d ? M - off : line, d ? line : M - off, d, main, false, true);
       }
       commit(plan);
     }
 
     // Search moves anchored on an existing tile.
     function search(dict, tries, wordsPer, allowBlank, exhaustive) {
-      const tiles = []; for (let i = 0; i < 225; i++) if (board[i]) tiles.push(i);
+      const tiles = []; for (let i = 0; i < SIZE; i++) if (board[i]) tiles.push(i);
       const out = [];
       const anchors = exhaustive ? tiles : Array.from({ length: tries }, () => pick(tiles));
       for (const ai of anchors) {
@@ -146,7 +152,7 @@
     }
     const leftover = [];
     for (let i = 0; i < 27; i++) for (let k = 0; k < pool[i]; k++) leftover.push(i === 26 ? '?' : String.fromCharCode(A + i));
-    return { board, words, turns: turn, placed: 100 - left, leftover };
+    return { board, words, turns: turn, placed: TOTAL - left, leftover };
   }
 
   // Run generate() several times and keep the first board that uses every tile (or the fullest one).
@@ -155,11 +161,11 @@
     for (let t = 0; t < tries; t++) {
       const g = generate({ ...opts, seed: (opts.seed ?? Math.floor(Math.random() * 2 ** 31)) + t * 7777 });
       if (!best || g.placed > best.placed) best = g;
-      if (g.placed === 100) break;
+      if (g.placed === TOTAL) break;
     }
     return best;
   }
 
-  const api = { buildDict, generate, generateFull, COUNTS, VALUES, N, CENTER };
+  const api = { buildDict, generate, generateFull, COUNTS, VALUES, TOTAL, N, SIZE, START };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.RSGen = api;
 })(typeof self !== 'undefined' ? self : this);

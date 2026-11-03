@@ -6,7 +6,7 @@ const bg = `<defs><radialGradient id="g" cx="50%" cy="20%" r="80%"><stop offset=
 const tiles = `<g transform="translate(512 512) scale(1.15) translate(-515 -530)">
 <defs>
  <linearGradient id="back" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a6b3e"/><stop offset="1" stop-color="#6e4627"/></linearGradient>
- <linearGradient id="face" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e9c8"/><stop offset="1" stop-color="#e2c690"/></linearGradient>
+ <linearGradient id="face" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dff3ea"/><stop offset="1" stop-color="#a7d5c3"/></linearGradient>
  <filter id="s" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity=".45"/></filter>
 </defs>
 <g transform="rotate(-12 430 470)" filter="url(#s)">
@@ -15,9 +15,9 @@ const tiles = `<g transform="translate(512 512) scale(1.15) translate(-515 -530)
  <text x="430" y="535" font-family="Inter Display" font-weight="800" font-size="190" text-anchor="middle" fill="rgba(255,236,205,.5)">?</text>
 </g>
 <g transform="rotate(8 600 600)" filter="url(#s)">
- <rect x="455" y="455" width="290" height="290" rx="36" fill="#a9844d"/>
+ <rect x="455" y="455" width="290" height="290" rx="36" fill="#4f8a76"/>
  <rect x="455" y="447" width="290" height="282" rx="36" fill="url(#face)"/>
- <text x="592" y="660" font-family="Inter Display" font-weight="800" font-size="200" text-anchor="middle" fill="#2b1c10">R</text>
+ <text x="592" y="660" font-family="Inter Display" font-weight="800" font-size="200" text-anchor="middle" fill="#10302a">R</text>
 </g></g>`;
 const svg = (w, h, inner) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`);
 (async () => {
