@@ -47,6 +47,19 @@ This game's board, bag and values are its own:
 
 Play solo, or pass one device around for 2 to 4 players. Your game is saved in the browser, so a reload picks up where you left off.
 
+### Online racing (2 to 4 players)
+
+Each player uses their own phone or computer, and there are **no turns**: everyone places tiles and presses Check whenever they like, racing for the same squares.
+
+- One player taps **Host an online game** and gets a four-letter room code (on the web there's also a `?room=ABCD` invite link). The others type the code and tap **Join**. The host deals when everyone's in, using the host's board and helper settings.
+- Everyone draws from one shared bag but has their own rack. You see every flipped tile, the crossed-out wrong guesses, everyone's live score and how many tiles each player holds (not their letters), plus a feed of each move as it happens.
+- Scoring is the same as normal, so one big careful Check (letters × number right) is worth more than lots of quick single guesses. After each Check there's a 2-second wait.
+- **Same square:** the first Check to reach the host wins it. A tile you'd put on a square someone else flipped goes back on your rack at no cost.
+- Peeks have no once-a-turn limit. There's no turn timer or pause; the game clock (if set) is the only timer. The game ends when every tile is face up, the clock runs out, or the host ends it.
+- If you drop out, join again with the same code on the same device to get your seat and score back. If the host reloads, **Reopen online game** opens the same room again.
+
+How it works: devices connect directly to each other over WebRTC using [PeerJS](https://peerjs.com/) (`peerjs.min.js`, MIT licence). The free public PeerJS server only introduces the devices. The host's device is the referee: it holds the bag and racks, scores each Check in the order they arrive, and sends everyone the result. A few networks (some mobile carriers and office firewalls) block direct connections. Fixing that needs a relay (TURN) server. For testing, `?peer=127.0.0.1:9000` points the game at your own PeerJS server.
+
 ## Android app
 
 The game is also packaged as an Android app for Google Play. [ANDROID.md](ANDROID.md) has every step, from trying it on your phone to publishing.
@@ -58,6 +71,7 @@ The game is also packaged as an Android app for Google Play. [ANDROID.md](ANDROI
 ## Files
 
 - `index.html` - the whole game (rules, scoring, board, timers)
+- `peerjs.min.js` - PeerJS 1.5.5, loaded only when you play online
 - `gen.js` - finished-board generator (also runs under Node for testing)
 - `gen-worker.js` - runs the generator off the main thread
 - `common.txt` - everyday words: common English words that are also in ENABLE, plus all two-letter words
