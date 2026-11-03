@@ -229,6 +229,16 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .breakdown li.good .n { color: var(--good); } .breakdown li.bad .n { color: var(--bad); }
 .breakdown li.total { background: transparent; border-top: 1px solid var(--line); border-radius: 0; font-size: 16px; }
 .breakdown li.total .n { font: 800 24px/1 var(--f-display); color: var(--ink); }
+/* Online rooms */
+.roomcode { font: 800 40px/1 var(--f-tile); letter-spacing: .3em; text-align: center; padding: 14px 0 10px; border-radius: 12px; background: var(--table); border: 1px dashed var(--line); }
+.final li.off { opacity: .55; }
+.score.off { opacity: .55; }
+.feed { position: fixed; right: 16px; top: 72px; z-index: 60; display: flex; flex-direction: column; gap: 6px; max-width: min(320px, calc(100vw - 32px)); pointer-events: none; }
+.feed div { padding: 8px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 8px 20px var(--shadow); font-size: 13px; display: flex; gap: 8px; align-items: center; animation: feedin .25s ease-out; }
+.feed div .n { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.feed div .n.neg { color: var(--bad); } .feed div .n.pos { color: var(--good); }
+@keyframes feedin { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .feed div { animation: none; } }
 .final { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .final li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; background: var(--panel-2); border-radius: 10px; }
 .final li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -265,6 +275,22 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
         <div class="stack" id="playerList" style="gap:8px"></div>
         <button class="btn small" id="addPlayer" type="button" style="align-self:flex-start">Add a player</button>
         <p class="small-note">Play solo, or pass one device around for up to four players.</p>
+      </div>
+      <div class="card stack">
+        <h2>Play online</h2>
+        <p class="small-note">Up to four players, each on their own phone or computer. There are no turns: everyone races to place tiles at the same time. The host's board and helper settings are used.</p>
+        <div class="field">
+          <label for="netName">Your name</label>
+          <input class="input" id="netName" maxlength="16" autocomplete="off">
+        </div>
+        <button class="btn" id="hostBtn" type="button" style="align-self:flex-start">Host an online game</button>
+        <div class="row">
+          <div class="field">
+            <label for="roomIn">Room code from the host</label>
+            <input class="input code" id="roomIn" maxlength="4" placeholder="ABCD" autocomplete="off">
+          </div>
+          <button class="btn" id="joinBtn" type="button">Join</button>
+        </div>
       </div>
       <div class="card stack">
         <h2>Board</h2>
@@ -416,12 +442,27 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
     </div>
   </div>
 </div>
+<!-- Online room -->
+<div class="overlay" id="roomDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
+    <h3 id="roomTitle"></h3>
+    <div class="roomcode" id="roomCode"></div>
+    <p class="muted" id="roomMsg" style="margin:0"></p>
+    <button class="btn small" id="roomCopy" type="button" style="align-self:center" hidden>Copy invite link</button>
+    <ul class="final" id="roomList"></ul>
+    <div class="actions">
+      <button class="btn" id="roomLeave" type="button">Leave</button>
+      <button class="btn primary" id="roomStart" type="button" hidden>Deal the board</button>
+    </div>
+  </div>
+</div>
+<div class="feed" id="feed" aria-live="polite"></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
@@ -467,6 +508,7 @@ const RULES = [
   `Tiles played as blanks in the finished game start face up as free clues. With <b>Show first letters</b> on, so does the first letter of every word.`,
   `<b>Swapping</b> puts tiles back in the bag and draws new ones, but costs the value of every tile you swap and ends your turn.`,
   `The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on your rack then count against you.`,
+  `<b>Online</b>, there are no turns. Everyone places tiles and presses Check whenever they like, with a 2-second wait between Checks. If someone flips a square first, your tile on it goes back on your rack at no cost. Peeks have no once-a-turn limit, and the game clock is the only timer.`,
 ];
 $('#rulesList').innerHTML = RULES.map(r => `<li>${r}</li>`).join('');
 
@@ -489,8 +531,10 @@ function renderSetup() {
   $('#boardNote').textContent = prefs.board === 'daily' ? `Everyone who picks today's board gets the same finished game (code ${dailyCode()}). Compare scores with friends.`
     : prefs.board === 'code' ? 'Type the code from a game a friend played to get the exact same board.'
     : 'A brand-new finished game is played out for you.';
-  const saved = store.get('rtt-game');
-  $('#resumeBtn').hidden = !(saved && !saved.over && saved.sol?.length === SIZE);
+  const saved = store.get('rtt-game'), live = NET && G && G.online && !G.over;
+  $('#resumeBtn').hidden = !(live || (saved && !saved.over && saved.sol?.length === SIZE));
+  $('#resumeBtn').textContent = live ? 'Back to online game' : saved?.online ? 'Reopen online game' : 'Continue saved game';
+  $('#netName').value = prefs.netName ?? prefs.players[0] ?? '';
 }
 function dailyCode() { const d = new Date(); return prefs.words + String((d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()) % 1000000).padStart(6, '0'); }
 $('#setupView').addEventListener('input', e => { const k = e.target.dataset.pl; if (k != null) { prefs.players[+k] = e.target.value; savePrefs(); } });
@@ -538,7 +582,8 @@ function makeBoard(mode, seed) {
 // G is the whole game and is saved after every change, so a reload picks up where you left off.
 let G = null;
 const S = { selected: null, pend: new Map(), swapMode: false, swapSel: new Set(), peekMode: false, flash: new Map(), fresh: new Set(), showAll: false };
-const save = () => G && store.set('rtt-game', G);
+const save = () => G && !isGuest() && store.set('rtt-game', G);
+const bagCount = () => G.bagN ?? G.bag.length;
 const cur = () => G.players[G.cur];
 const allRuns = sol => { // every word on the finished board: maximal runs of 2+ tiles across and down
   const runs = [];
@@ -553,7 +598,8 @@ const allRuns = sol => { // every word on the finished board: maximal runs of 2+
 };
 const runText = run => run.map(i => G.sol[i].ch).join('');
 
-async function startGame(code, again) {
+// net: the online room's players [{name, cid}] when hosting; otherwise players come from the setup screen.
+async function startGame(code, again, net) {
   const p = parseCode(code);
   if (!p) { toast('That board code doesn\'t look right. It\'s a letter then numbers, like E123456.'); return; }
   show('loading');
@@ -561,12 +607,13 @@ async function startGame(code, again) {
   try { gen = await makeBoard(p.mode, p.seed); }
   catch (err) { show('setup'); toast('Couldn\'t build the board: ' + err.message); return; }
   const sol = gen.board.map(x => x ? { ch: x.ch, blank: !!x.blank, turn: x.turn } : null);
-  const names = prefs.players.map((n, k) => (n || '').trim() || 'Player ' + (k + 1));
+  const names = net ? net.map(x => x.name) : prefs.players.map((n, k) => (n || '').trim() || 'Player ' + (k + 1));
   G = {
     v: APP_VERSION, code: p.mode + p.seed, sol, rev: new Array(SIZE).fill(0), notes: {}, bag: [],
-    players: names.map(name => ({ name, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0 })),
+    players: names.map((name, k) => ({ name, cid: net?.[k].cid, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0 })),
+    online: !!net, room: net ? NET.room : null,
     cur: 0, turn: 1, passes: 0, log: [], over: false, endReason: '',
-    opts: { turnSec: prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, firsts: prefs.firsts, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
+    opts: { turnSec: net ? 0 : prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, firsts: prefs.firsts, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
     gameLeft: prefs.gameMin * 60, turnLeft: prefs.turnSec, phase: 'pass', peekedThisTurn: false, firstWord: gen.words[0]?.cells || [],
   };
   // Blank tiles from the finished game are free clues; so is the opening word if that helper is on.
@@ -578,6 +625,7 @@ async function startGame(code, again) {
   for (const pl of G.players) refill(pl);
   G.log.push({ who: -1, text: `Board <b>${esc(G.code)}</b> dealt: ${gen.words.length} words, ${gen.placed} tiles.` });
   resetTurnUI();
+  if (net) { G.phase = 'turn'; save(); show('game'); netSend(); return; }
   save(); show('game');
   beginTurnPrompt();
 }
@@ -617,8 +665,26 @@ function placeTile(id, cell, fromCell) {
 
 function checkMove() {
   if (G.phase !== 'turn' || !S.pend.size) return;
-  const p = cur(), right = [], wrong = [];
-  for (const [i, t] of S.pend) (G.sol[i].ch === t.ch ? right : wrong).push({ i, ch: t.ch, id: t.id });
+  if (G.online) return netCheck();
+  const r = scoreMove(G.cur, S.pend);
+  S.pend = new Map(); S.selected = null;
+  S.flash = new Map(); S.fresh = new Set(r.right.map(x => x.i));
+  for (const w of r.wrong) S.flash.set(w.i, w.ch);
+  G.phase = 'result'; save(); render();
+  const p = cur(), total = r.total;
+  $('#resultTitle').textContent = total > 0 ? `+${total} for ${p.name}` : total < 0 ? `${total} for ${p.name}` : `No points for ${p.name}`;
+  $('#resultList').innerHTML = breakdownHTML(r);
+  $('#resultDlg').hidden = false; $('#resultOk').focus();
+  playSound(moveSound(r));
+}
+const moveSound = r => r.right.length && !r.wrong.length ? 'good' : r.wrong.length && !r.right.length ? 'bad' : 'mixed';
+const breakdownHTML = r => r.lines.map(x => `<li class="${x.cls}"><span>${x.l}</span><span class="n">${x.n > 0 ? '+' : ''}${x.n}</span></li>`).join('')
+  + `<li class="total"><span>Turn total</span><span class="n">${r.total > 0 ? '+' : ''}${r.total}</span></li>`;
+
+// Scores player k's tiles in pend (cell -> {id, ch}) and updates the game. Shared by local play and the online host.
+function scoreMove(k, pend) {
+  const p = G.players[k], right = [], wrong = [];
+  for (const [i, t] of pend) (G.sol[i].ch === t.ch ? right : wrong).push({ i, ch: t.ch, id: t.id });
   const lines = [];
   // Correct tiles: letter value with letter bonuses, then multiplied by how many were right.
   let letters = 0;
@@ -655,21 +721,13 @@ function checkMove() {
   const total = base - pen + wordPts + sweep + streak;
   p.score += total; p.right += right.length; p.wrong += wrong.length; p.words += done.length;
 
-  const used = new Set([...S.pend.values()].map(t => t.id));
+  const used = new Set([...pend.values()].map(t => t.id));
   p.rack = p.rack.filter(t => !used.has(t.id));
   for (const w of wrong) G.bag.push(w.ch);
   shuffle(G.bag); refill(p);
   G.passes = 0;
-  S.flash = new Map(); S.fresh = new Set(right.map(r => r.i));
-  for (const w of wrong) S.flash.set(w.i, w.ch);
-  G.log.push({ who: G.cur, text: `${right.length}✓ ${wrong.length}✕${done.length ? ' · <b>' + done.map(esc).join(', ') + '</b>' : ''}`, n: total });
-  S.pend = new Map(); S.selected = null;
-  G.phase = 'result'; save(); render();
-  $('#resultTitle').textContent = total > 0 ? `+${total} for ${p.name}` : total < 0 ? `${total} for ${p.name}` : `No points for ${p.name}`;
-  $('#resultList').innerHTML = lines.map(x => `<li class="${x.cls}"><span>${x.l}</span><span class="n">${x.n > 0 ? '+' : ''}${x.n}</span></li>`).join('')
-    + `<li class="total"><span>Turn total</span><span class="n">${total > 0 ? '+' : ''}${total}</span></li>`;
-  $('#resultDlg').hidden = false; $('#resultOk').focus();
-  playSound(right.length && !wrong.length ? 'good' : wrong.length && !right.length ? 'bad' : 'mixed');
+  G.log.push({ who: k, text: `${right.length}✓ ${wrong.length}✕${done.length ? ' · <b>' + done.map(esc).join(', ') + '</b>' : ''}`, n: total });
+  return { lines, total, right, wrong, done };
 }
 $('#resultOk').addEventListener('click', () => { $('#resultDlg').hidden = true; S.flash = new Map(); afterTurn(); });
 
@@ -690,8 +748,15 @@ function passTurn(reason) {
 }
 
 function doSwap() {
-  const p = cur(), ids = S.swapSel;
+  const ids = S.swapSel;
   if (!ids.size) { S.swapMode = false; render(); return; }
+  if (G.online) return netSwap([...ids]);
+  swapTiles(G.cur, ids);
+  resetTurnUI(); G.phase = 'between'; save();
+  afterTurn();
+}
+function swapTiles(k, ids) {
+  const p = G.players[k];
   const back = p.rack.filter(t => ids.has(t.id));
   p.rack = p.rack.filter(t => !ids.has(t.id));
   refill(p);
@@ -700,64 +765,79 @@ function doSwap() {
   // Swapping costs the face value of every tile put back.
   const cost = back.reduce((n, t) => n + VALUES[t.ch], 0);
   p.score -= cost;
-  G.log.push({ who: G.cur, text: `Swapped ${back.map(t => '<b>' + t.ch + '</b>').join(' ')}`, n: -cost });
-  resetTurnUI(); G.phase = 'between'; save();
-  afterTurn();
+  G.log.push({ who: k, text: `Swapped ${back.map(t => '<b>' + t.ch + '</b>').join(' ')}`, n: -cost });
+  return cost;
 }
 
 // Peek: pay to flip one tile. Its letter leaves the bag (or a rack, if every copy has been drawn).
 function peek(i) {
   if (!G.sol[i] || G.rev[i] || S.pend.has(i)) return;
-  const p = cur(), ch = G.sol[i].ch;
-  let k = G.bag.indexOf(ch);
-  if (k >= 0) G.bag.splice(k, 1);
+  if (G.online) return netPeek(i);
+  peekTile(G.cur, i, new Set([...S.pend.values()].map(t => t.id)));
+  S.peekMode = false; S.fresh = new Set([i]);
+  save(); render();
+  if (!hiddenCount()) { G.phase = 'between'; endGame('Every tile is face up.'); }
+}
+// Flips cell i for player k. keep: tile ids k has down on the board that mustn't be taken.
+function peekTile(k, i, keep) {
+  const p = G.players[k], ch = G.sol[i].ch;
+  let at = G.bag.indexOf(ch);
+  if (at >= 0) G.bag.splice(at, 1);
   else {
-    const order = [G.cur, ...G.players.map((_, j) => j).filter(j => j !== G.cur)];
+    const order = [k, ...G.players.map((_, j) => j).filter(j => j !== k)];
     for (const j of order) {
-      const pl = G.players[j], usedIds = j === G.cur ? new Set([...S.pend.values()].map(t => t.id)) : new Set();
+      const pl = G.players[j], usedIds = j === k ? keep : new Set();
       const t = pl.rack.find(t => t.ch === ch && !usedIds.has(t.id));
       if (t) { pl.rack = pl.rack.filter(x => x !== t); refill(pl); break; }
     }
   }
-  G.rev[i] = 3; p.score -= PEEK_COST; p.peeks++; G.peekedThisTurn = true; S.peekMode = false; S.fresh = new Set([i]);
-  G.log.push({ who: G.cur, text: `Peeked: <b>${ch}</b>`, n: -PEEK_COST });
-  save(); render();
-  if (!hiddenCount()) { G.phase = 'between'; endGame('Every tile is face up.'); }
+  G.rev[i] = 3; p.score -= PEEK_COST; p.peeks++; G.peekedThisTurn = true;
+  G.log.push({ who: k, text: `Peeked: <b>${ch}</b>`, n: -PEEK_COST });
 }
 
 function endGame(reason) {
   G.over = true; G.phase = 'over'; G.endReason = reason;
   for (const p of G.players) { p.left = p.rack.reduce((s, t) => s + VALUES[t.ch], 0); p.score -= p.left; }
-  const best = store.get('rtt-best') || {};
   let note = reason;
   if (G.players.length === 1) {
+    const best = store.get('rtt-best') || {};
     const p = G.players[0], prev = best[G.code];
     if (prev == null || p.score > prev) { best[G.code] = p.score; store.set('rtt-best', best); if (prev != null) note += ` New best on this board (was ${prev}).`; }
     else note += ` Your best on this board is ${prev}.`;
   }
-  save(); render();
+  G.endNote = note;
+  save();
+  if (G.online) netSend();
+  showEnd();
+}
+function showEnd() {
+  render();
+  const note = G.endNote || G.endReason;
   const ranked = G.players.map((p, k) => ({ ...p, k })).sort((a, b) => b.score - a.score);
   $('#endTitle').textContent = G.players.length === 1 ? `You scored ${ranked[0].score}` : `${ranked[0].name} wins with ${ranked[0].score}`;
   $('#endMsg').textContent = note;
   $('#finalList').innerHTML = ranked.map(p => `<li><span class="dot" style="background:${SEATS[p.k]}"></span>
     <span style="min-width:0;display:flex;flex-direction:column"><strong>${esc(p.name)}</strong>
-    <span class="adj">${p.right} right · ${p.wrong} wrong · ${p.words} word${p.words === 1 ? '' : 's'} finished${p.peeks ? ` · ${p.peeks} peek${p.peeks > 1 ? 's' : ''}` : ''}${p.left ? ` · −${p.left} left on rack` : ''}</span></span>
+    <span class="adj">${p.off ? 'left the game · ' : ''}${p.right} right · ${p.wrong} wrong · ${p.words} word${p.words === 1 ? '' : 's'} finished${p.peeks ? ` · ${p.peeks} peek${p.peeks > 1 ? 's' : ''}` : ''}${p.left ? ` · −${p.left} left on rack` : ''}</span></span>
     <span class="pts">${p.score}</span></li>`).join('');
+  $('#replayBtn').hidden = !!G.online;
   $('#endDlg').hidden = false;
   playSound('end');
 }
 $('#seeBoard').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = true; render(); });
 $('#replayBtn').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = false; startGame(G.code); });
-$('#newBtn').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = false; store.del('rtt-game'); G = null; show('setup'); });
+$('#newBtn').addEventListener('click', () => { $('#endDlg').hidden = true; S.showAll = false; leaveRoom(); if (!isGuest()) store.del('rtt-game'); G = null; show('setup'); });
 $('#quitBtn').addEventListener('click', () => {
-  if (!G || G.over) { S.showAll = false; store.del('rtt-game'); G = null; show('setup'); return; }
+  if (!G || G.over) { S.showAll = false; leaveRoom(); store.del('rtt-game'); G = null; show('setup'); return; }
+  if (isGuest()) { if (confirm('Leave this online game? Your score stays on the board.')) { leaveRoom(); G = null; show('setup'); } return; }
+  if (G.online) { if (confirm('End the game for everyone? Tiles on racks will count against each player.')) { resetTurnUI(); endGame('The host ended the game.'); } return; }
   if (confirm('End this game now? Tiles on racks will count against each player.')) { resetTurnUI(); endGame('Game ended early.'); }
 });
 
 // ---------- Pause ----------
 // Pausing stops the turn timer and game clock and covers the board and rack until play resumes.
 function setPaused(on) {
-  if (!G || G.over || G.phase !== 'turn') return;
+  if (!G || G.over || G.phase !== 'turn' || G.online) return;
   G.paused = on; save();
   showPause();
 }
@@ -778,8 +858,13 @@ $('#turnline').addEventListener('click', e => { if (e.target.closest('[data-act=
 let lastTick = performance.now();
 setInterval(() => {
   const now = performance.now(), dt = (now - lastTick) / 1000; lastTick = now;
-  if (!G || G.over || G.paused || G.phase !== 'turn' || document.hidden) return;
-  if (G.opts.gameMin) { G.gameLeft -= dt; if (G.gameLeft <= 0) { G.gameLeft = 0; resetTurnUI(); return endGame('The game clock ran out.'); } }
+  if (!G || G.over || G.paused || G.phase !== 'turn' || (document.hidden && !G.online)) return;
+  if (G.opts.gameMin) {
+    G.gameLeft -= dt;
+    // Online, only the host's clock counts; everyone else's is just a display it keeps correcting.
+    if (G.gameLeft <= 0) { G.gameLeft = 0; if (isGuest()) return renderClocks(); resetTurnUI(); return endGame('The game clock ran out.'); }
+    if (G.online && !isGuest() && Math.floor(G.gameLeft / 5) !== Math.floor((G.gameLeft + dt) / 5)) netBroadcast({ t: 'clock', left: G.gameLeft });
+  }
   if (G.opts.turnSec) {
     const before = Math.ceil(G.turnLeft);
     G.turnLeft -= dt;
@@ -789,6 +874,347 @@ setInterval(() => {
   renderClocks();
   if (Math.floor(now / 2000) !== Math.floor((now - dt * 1000) / 2000)) save();
 }, 250);
+
+// ---------- Online play ----------
+// Peer to peer over WebRTC (PeerJS). The host's device is the referee: it holds the bag and every rack,
+// scores each Check in the order they arrive, and sends everyone the new state. Guests only send requests.
+// The free public PeerJS server is used just to introduce the devices; the game itself goes device to device.
+const ROOM_PREFIX = 'reverse-tile-table-v1-', ROOM_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ', MAX_ONLINE = 4, COOLDOWN = 2000;
+let NET = null; // { role: 'host'|'guest', room, peer, lobby: [{name, cid, on}], conns (host), conn (guest), tries }
+const isGuest = () => NET?.role === 'guest';
+const myCid = (() => { let c = store.get('rtt-cid'); if (!c) { c = Math.random().toString(36).slice(2, 12); store.set('rtt-cid', c); } return c; })();
+const myName = () => $('#netName').value.trim();
+$('#netName').addEventListener('input', e => { prefs.netName = e.target.value; savePrefs(); });
+$('#roomIn').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+
+function loadPeer() {
+  if (window.Peer) return Promise.resolve();
+  return new Promise((ok, fail) => {
+    const sc = document.createElement('script'); sc.src = 'peerjs.min.js';
+    sc.onload = ok; sc.onerror = () => fail(new Error('Couldn\'t load the online module.'));
+    document.head.appendChild(sc);
+  });
+}
+// ?peer=host:port points at your own PeerJS server instead of the public one (used for testing).
+function peerOpts() {
+  const q = new URLSearchParams(location.search).get('peer');
+  if (!q) return { debug: 0 };
+  const [host, port] = q.split(':');
+  return { host, port: +port || 9000, path: '/', secure: location.protocol === 'https:', debug: 0 };
+}
+const newRoomCode = () => Array.from({ length: 4 }, () => ROOM_LETTERS[rand(ROOM_LETTERS.length)]).join('');
+const send = (conn, msg) => { try { if (conn?.open) conn.send(msg); } catch {} };
+
+function leaveRoom() {
+  if (!NET) return;
+  const n = NET; NET = null; n.leaving = true;
+  if (n.role === 'guest') send(n.conn, { t: 'bye' });
+  else for (const c of n.conns.values()) send(c, { t: 'closed', msg: G && !G.over ? 'The host left the game.' : 'The host closed the room.' });
+  setTimeout(() => { try { n.peer.destroy(); } catch {} }, 300);
+  $('#roomDlg').hidden = true;
+}
+
+// --- Room screen
+function showRoom(msg) {
+  if (!NET) { $('#roomDlg').hidden = true; return; }
+  const host = NET.role === 'host';
+  $('#roomTitle').textContent = host ? 'Your online room' : 'Joined room';
+  $('#roomCode').textContent = NET.room || '····';
+  const web = /^https?:$/.test(location.protocol) && !window.Capacitor;
+  $('#roomCopy').hidden = !(host && web && NET.ready);
+  const n = NET.lobby?.length || 0;
+  $('#roomMsg').textContent = msg || (!NET.ready ? 'Opening the room…'
+    : host ? (n < 2 ? 'Tell your friends this code. They tap Join on their own device and type it in.' : `${n} of ${MAX_ONLINE} players in. Deal when everyone's here.`)
+    : 'Waiting for the host to deal the board.');
+  $('#roomList').innerHTML = (NET.lobby || []).map((p, k) => `<li class="${p.on ? '' : 'off'}"><span class="dot" style="background:${SEATS[k]}"></span>
+    <strong>${esc(p.name)}${p.cid === myCid ? ' (you)' : ''}</strong><span class="adj">${k === 0 ? 'host' : p.on ? '' : 'reconnecting'}</span></li>`).join('');
+  $('#roomStart').hidden = !host;
+  $('#roomStart').disabled = !NET.ready || n < 2;
+  $('#roomDlg').hidden = false;
+}
+$('#roomLeave').addEventListener('click', () => { leaveRoom(); if (G?.online) G = null; show('setup'); });
+$('#roomCopy').addEventListener('click', async () => {
+  const url = location.origin + location.pathname + '?room=' + NET.room;
+  try { await navigator.clipboard.writeText(url); toast('Invite link copied.'); } catch { toast(url); }
+});
+$('#roomStart').addEventListener('click', () => {
+  if (!NET || NET.role !== 'host' || NET.lobby.length < 2) return;
+  $('#roomDlg').hidden = true;
+  netBroadcast({ t: 'dealing' });
+  const code = prefs.board === 'daily' ? dailyCode() : prefs.board === 'code' ? $('#codeIn').value : prefs.words + (1 + rand(999999));
+  NET.lobby = NET.lobby.filter(p => p.on);
+  startGame(code, false, NET.lobby.map(p => ({ name: p.name, cid: p.cid }))).then(() => { if (!G?.online) showRoom(); });
+});
+
+// --- Hosting
+$('#hostBtn').addEventListener('click', async () => {
+  if (!myName()) { $('#netName').focus(); toast('Type your name first.'); return; }
+  leaveRoom();
+  try { await loadPeer(); } catch (e) { toast(e.message); return; }
+  G = null; store.del('rtt-game');
+  openHost(newRoomCode(), true);
+});
+function openHost(room, fresh) {
+  const peer = new Peer(ROOM_PREFIX + room, peerOpts());
+  NET = { role: 'host', room, peer, conns: new Map(), ready: false, lobby: fresh ? [{ name: myName(), cid: myCid, on: true }] : null };
+  const net = NET;
+  if (fresh) showRoom();
+  peer.on('open', () => { if (NET !== net) return; net.ready = true; if (fresh) showRoom(); else { toast(`Room ${room} is open again. Players can rejoin.`); } });
+  peer.on('connection', conn => {
+    conn.on('data', d => { if (NET === net) hostRecv(conn, d); });
+    conn.on('close', () => { if (NET === net) hostDrop(conn); });
+  });
+  peer.on('disconnected', () => { if (NET === net && !net.leaving) setTimeout(() => { try { peer.reconnect(); } catch {} }, 2000); });
+  peer.on('error', err => {
+    if (NET !== net) return;
+    if (err.type === 'unavailable-id') { // someone else has that room code
+      try { peer.destroy(); } catch {}
+      if (fresh) return openHost(newRoomCode(), true);
+      return setTimeout(() => { if (NET === net) openHost(room, false); }, 4000); // our old connection hasn't timed out yet
+    }
+    if (err.type === 'peer-unavailable') return;
+    if (!net.ready) { NET = null; $('#roomDlg').hidden = true; toast('Couldn\'t open an online room. Check your internet connection and try again.'); }
+  });
+}
+// Called when the host comes back to a saved online game.
+async function reopenRoom() {
+  try { await loadPeer(); } catch (e) { toast(e.message); return; }
+  for (const p of G.players.slice(1)) p.off = true;
+  G.phase = 'turn'; G.paused = false;
+  openHost(G.room, false);
+  show('game');
+}
+function seatOf(conn) { return G?.online ? G.players.findIndex(p => p.cid === conn.cid) : -1; }
+function hostRecv(conn, d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'hello') {
+    const cid = String(d.cid || '').slice(0, 20), name = String(d.name || '').trim().slice(0, 16) || 'Player';
+    if (!cid) return;
+    conn.cid = cid; conn.seen = Date.now();
+    const old = NET.conns.get(cid); if (old && old !== conn) { old.cid = null; try { old.close(); } catch {} }
+    if (G?.online) { // game already running: only players from this game can come back
+      const k = seatOf(conn);
+      if (k < 0) { send(conn, { t: 'nope', msg: 'That game has already started.' }); setTimeout(() => conn.close(), 300); return; }
+      NET.conns.set(cid, conn); G.players[k].off = false;
+      G.log.push({ who: k, text: 'Back online' });
+      netSend(); return;
+    }
+    const seat = NET.lobby.find(p => p.cid === cid);
+    if (seat) { seat.on = true; seat.name = name; }
+    else if (NET.lobby.length >= MAX_ONLINE) { send(conn, { t: 'nope', msg: 'That room is full (four players).' }); setTimeout(() => conn.close(), 300); return; }
+    else NET.lobby.push({ name, cid, on: true });
+    NET.conns.set(cid, conn);
+    lobbySend(); return;
+  }
+  conn.seen = Date.now();
+  if (d.t === 'ping') return;
+  if (d.t === 'bye') { hostDrop(conn, true); return; }
+  const k = seatOf(conn);
+  if (k < 0 || !G || G.over) return;
+  if (d.t === 'check') hostCheck(k, d.place);
+  else if (d.t === 'swap') hostSwap(k, d.ids);
+  else if (d.t === 'peek') hostPeek(k, d.i);
+}
+function hostDrop(conn, left) {
+  if (!conn.cid || NET.conns.get(conn.cid) !== conn) return;
+  NET.conns.delete(conn.cid);
+  if (G?.online) {
+    const k = seatOf(conn); if (k < 0) return;
+    G.players[k].off = true;
+    if (!G.over) G.log.push({ who: k, text: left ? 'Left the game' : 'Lost connection' });
+    netSend(); return;
+  }
+  NET.lobby = NET.lobby.filter(p => p.cid !== conn.cid);
+  lobbySend();
+}
+// Heartbeat: guests ping every few seconds, so a phone that drops off is spotted quickly (WebRTC can take a minute to notice).
+setInterval(() => {
+  if (!NET || NET.leaving) return;
+  if (NET.role === 'guest') { send(NET.conn, { t: 'ping' }); return; }
+  for (const c of [...NET.conns.values()]) if (Date.now() - (c.seen || 0) > 12000) { hostDrop(c); try { c.close(); } catch {} }
+}, 3000);
+function lobbySend() {
+  netBroadcast({ t: 'lobby', room: NET.room, players: NET.lobby });
+  showRoom();
+}
+function netBroadcast(msg) { if (NET?.role === 'host') for (const c of NET.conns.values()) send(c, msg); }
+// Everyone gets the whole game except other players' racks and the bag's contents.
+function guestView(k) {
+  const g = JSON.parse(JSON.stringify(G));
+  g.bagN = G.bag.length; g.bag = [];
+  g.players.forEach((p, j) => { p.held = G.players[j].rack.length; if (j !== k) p.rack = []; });
+  g.cur = k;
+  return g;
+}
+// Host: save, redraw, and send each guest its view. ev describes the move just made, for the flash and the feed.
+function netSend(ev) {
+  if (!G) return;
+  save();
+  if (ev) netShowEvent(ev);
+  hostPrune(); render();
+  if (NET?.role !== 'host') return;
+  for (const c of NET.conns.values()) { const k = seatOf(c); if (k >= 0) send(c, { t: 'state', G: guestView(k), ev }); }
+}
+function eventOf(k, r) { return { who: k, right: r.right.map(x => x.i), wrong: r.wrong.map(w => [w.i, w.ch]), total: r.total, words: r.done }; }
+function hostCheck(k, place) {
+  const p = G.players[k], pend = new Map(), seen = new Set();
+  let bounced = 0;
+  for (const [i, id] of Array.isArray(place) ? place.slice(0, RACK) : []) {
+    const t = p.rack.find(x => x.id === id);
+    if (!t || seen.has(id) || pend.has(i)) continue;
+    seen.add(id);
+    if (!G.sol[i] || G.rev[i]) { bounced++; continue; } // someone got there first: the tile just goes back on the rack
+    pend.set(i, { id, ch: t.ch });
+  }
+  const r = pend.size ? scoreMove(k, pend) : { lines: [], total: 0, right: [], wrong: [], done: [] };
+  r.bounced = bounced;
+  if (bounced) r.lines.push({ cls: '', l: `${bounced} tile${bounced > 1 ? 's' : ''} back on your rack: someone flipped ${bounced > 1 ? 'those squares' : 'that square'} first`, n: 0 });
+  const ev = eventOf(k, r);
+  if (k === G.cur) netResult(r); else send(NET.conns.get(p.cid), { t: 'result', r });
+  netSend(ev);
+  if (!hiddenCount()) endGame('Every tile is face up.');
+}
+function hostSwap(k, ids) {
+  const p = G.players[k], set = new Set((Array.isArray(ids) ? ids : []).filter(id => p.rack.some(t => t.id === id)));
+  if (!set.size || set.size > G.bag.length) return;
+  const cost = swapTiles(k, set);
+  netSend({ who: k, total: -cost, swap: set.size });
+}
+function hostPeek(k, i) {
+  if (!G.opts.peek || !G.sol[i] || G.rev[i]) return;
+  const keep = k === G.cur ? new Set([...S.pend.values()].map(t => t.id)) : new Set();
+  peekTile(k, i, keep);
+  netSend({ who: k, total: -PEEK_COST, peek: i });
+  if (!hiddenCount()) endGame('Every tile is face up.');
+}
+
+// --- Joining
+$('#joinBtn').addEventListener('click', async () => {
+  const room = $('#roomIn').value.trim().toUpperCase();
+  if (!/^[A-Z]{4}$/.test(room)) { $('#roomIn').focus(); toast('Room codes are four letters, like ABCD.'); return; }
+  if (!myName()) { $('#netName').focus(); toast('Type your name first.'); return; }
+  leaveRoom();
+  try { await loadPeer(); } catch (e) { toast(e.message); return; }
+  if (G && !G.online) save();
+  G = null;
+  const peer = new Peer(peerOpts());
+  NET = { role: 'guest', room, peer, ready: false, lobby: [], tries: 0 };
+  const net = NET;
+  showRoom('Connecting…');
+  peer.on('open', () => { if (NET === net) guestConnect(net); });
+  peer.on('disconnected', () => { if (NET === net && !net.leaving) setTimeout(() => { try { peer.reconnect(); } catch {} }, 2000); });
+  peer.on('error', err => {
+    if (NET !== net) return;
+    if (err.type === 'peer-unavailable') {
+      if (G?.online) return guestRetry(net); // host's device is reconnecting
+      leaveRoom(); show('setup'); toast(`No open room called ${room}. Check the code with the host.`); return;
+    }
+    if (!net.ready && !G) { leaveRoom(); show('setup'); toast('Couldn\'t get online. Check your internet connection and try again.'); }
+  });
+});
+function guestConnect(net) {
+  const c = net.peer.connect(ROOM_PREFIX + net.room, { reliable: true });
+  net.conn = c;
+  c.on('open', () => { if (NET !== net) return; net.tries = 0; send(c, { t: 'hello', cid: myCid, name: myName() }); });
+  c.on('data', d => { if (NET === net && net.conn === c) guestRecv(d); });
+  c.on('close', () => { if (NET === net && net.conn === c && !net.leaving) guestRetry(net); });
+}
+function guestRetry(net) {
+  if (net.retrying) return;
+  if (++net.tries > 20) { leaveRoom(); toast('Lost touch with the host.'); if (G) { G.over = true; render(); } return; }
+  net.retrying = true;
+  if (G && !G.over) toast('Reconnecting to the host…'); else showRoom('Reconnecting…');
+  setTimeout(() => { net.retrying = false; if (NET === net) guestConnect(net); }, 3000);
+}
+function guestRecv(d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'lobby') { NET.ready = true; NET.lobby = d.players || []; if (!G) showRoom(); }
+  else if (d.t === 'dealing') { $('#roomDlg').hidden = true; show('loading'); $('#loadingMsg').textContent = 'The host is dealing the board. This takes a few seconds.'; }
+  else if (d.t === 'nope') { leaveRoom(); show('setup'); toast(d.msg); }
+  else if (d.t === 'closed') { const msg = d.msg; leaveRoom(); if (G && !G.over) { G.over = true; G.endReason = msg; render(); } else { G = null; show('setup'); } toast(msg); }
+  else if (d.t === 'clock' && G) { G.gameLeft = d.left; renderClocks(); }
+  else if (d.t === 'result') netResult(d.r);
+  else if (d.t === 'state') guestState(d.G, d.ev);
+}
+function guestState(g, ev) {
+  const wasOver = G?.over, fresh = !G;
+  // Keep the order this player arranged their rack in.
+  const order = G ? cur().rack.map(t => t.id) : [];
+  G = g;
+  const rack = cur().rack, pos = id => { const n = order.indexOf(id); return n < 0 ? 1e9 : n; };
+  rack.sort((a, b) => pos(a.id) - pos(b.id));
+  if (fresh) { resetTurnUI(); $('#roomDlg').hidden = true; show('game'); }
+  else if ($('#gameView').hidden && !$('#loadingView').hidden) show('game');
+  if (ev) netShowEvent(ev);
+  hostPrune();
+  render();
+  if (G.over && !wasOver) { S.pend = new Map(); showEnd(); }
+}
+// Drop any of my pending tiles that sit on squares someone else just flipped, or that left my rack.
+function hostPrune() {
+  if (!G || !S.pend.size) return;
+  let lost = 0;
+  for (const [i, t] of [...S.pend]) {
+    if (G.rev[i]) { S.pend.delete(i); lost++; }
+    else if (!cur().rack.some(r => r.id === t.id)) S.pend.delete(i);
+  }
+  if (lost) toast(lost > 1 ? `Someone flipped ${lost} of your squares first. Those tiles are back on your rack.` : 'Someone flipped one of your squares first. That tile is back on your rack.');
+}
+
+// --- Playing online (shared by host and guests)
+function netCheck() {
+  if (S.waiting || Date.now() < (S.coolUntil || 0)) return;
+  const place = [...S.pend].map(([i, t]) => [i, t.id]);
+  if (isGuest()) { S.waiting = true; send(NET.conn, { t: 'check', place }); render(); setTimeout(() => { if (S.waiting) { S.waiting = false; render(); } }, 8000); return; }
+  hostCheck(G.cur, place);
+}
+function netSwap(ids) {
+  resetTurnUI();
+  if (isGuest()) send(NET.conn, { t: 'swap', ids }); else hostSwap(G.cur, ids);
+  render();
+}
+function netPeek(i) {
+  S.peekMode = false;
+  if (isGuest()) send(NET.conn, { t: 'peek', i }); else hostPeek(G.cur, i);
+  render();
+}
+// My own Check came back: clear what I put down and show the score without stopping play.
+function netResult(r) {
+  S.waiting = false;
+  const done = new Set([...r.right.map(x => x.i), ...r.wrong.map(w => w.i)]);
+  for (const i of done) S.pend.delete(i);
+  S.coolUntil = Date.now() + COOLDOWN;
+  setTimeout(() => G && render(), COOLDOWN + 50);
+  const bits = r.lines.map(x => x.l.replace(/<[^>]+>/g, '')).filter(Boolean);
+  toast(`${r.total > 0 ? '+' : ''}${r.total}: ${bits.join(' · ') || 'nothing scored'}`);
+  playSound(r.right.length || r.wrong.length ? moveSound(r) : 'tick');
+  render();
+}
+// Flash other players' moves on the board and in the corner feed.
+function netShowEvent(ev) {
+  if (ev.who !== G.cur) {
+    for (const i of ev.right || []) S.fresh.add(i);
+    for (const [i, ch] of ev.wrong || []) S.flash.set(i, ch);
+    if (ev.wrong?.length) setTimeout(() => { for (const [i] of ev.wrong) S.flash.delete(i); G && render(); }, 1600);
+  } else for (const [i, ch] of ev.wrong || []) { S.flash.set(i, ch); setTimeout(() => { S.flash.delete(i); G && render(); }, 1600); }
+  const p = G.players[ev.who]; if (!p) return;
+  const what = ev.swap ? `swapped ${ev.swap}` : ev.peek != null ? 'peeked' : ev.words?.length ? `finished <b>${ev.words.map(esc).join(', ')}</b>` : `${ev.right.length}✓ ${ev.wrong.length}✕`;
+  const el = document.createElement('div');
+  el.innerHTML = `<span class="dot" style="background:${SEATS[ev.who]}"></span><span>${esc(p.name)} ${what}</span><span class="n ${ev.total < 0 ? 'neg' : ev.total > 0 ? 'pos' : ''}">${ev.total > 0 ? '+' : ''}${ev.total}</span>`;
+  const feed = $('#feed'); feed.prepend(el);
+  while (feed.children.length > 4) feed.lastChild.remove();
+  setTimeout(() => el.remove(), 5000);
+}
+function netActions() {
+  if (S.swapMode) return '';
+  const cool = Date.now() < (S.coolUntil || 0);
+  return `
+    <button class="btn" type="button" data-act="recall" ${S.pend.size ? '' : 'disabled'}>Recall</button>
+    <button class="btn" type="button" data-act="shuffle">Shuffle</button>
+    ${G.opts.peek ? `<button class="btn" type="button" data-act="peek" aria-pressed="${S.peekMode}">Peek −${PEEK_COST}</button>` : ''}
+    <button class="btn" type="button" data-act="swap" ${bagCount() && !S.pend.size ? '' : 'disabled'}>Swap</button>
+    <button class="btn primary" type="button" data-act="check" ${S.pend.size && !S.waiting && !cool ? '' : 'disabled'}>${S.waiting ? 'Checking…' : 'Check'}</button>`;
+}
 
 // ---------- Sound ----------
 let audio = null;
@@ -971,9 +1397,10 @@ function renderRack() {
   if (G.over || G.phase !== 'turn') { a.innerHTML = G.over && hiddenCount() ? `<button class="btn" type="button" data-act="toggleAll">${S.showAll ? 'Hide unfound tiles' : 'Show the full board'}</button>` : ''; return; }
   if (S.swapMode) {
     a.innerHTML = `<button class="btn" type="button" data-act="swapCancel">Cancel</button>
-      <button class="btn primary" type="button" data-act="swapGo" ${S.swapSel.size && S.swapSel.size <= G.bag.length ? '' : 'disabled'}>Swap ${S.swapSel.size || ''}</button>`;
+      <button class="btn primary" type="button" data-act="swapGo" ${S.swapSel.size && S.swapSel.size <= bagCount() ? '' : 'disabled'}>Swap ${S.swapSel.size || ''}</button>`;
     return;
   }
+  if (G.online) { a.innerHTML = netActions(); return; }
   const canPeek = G.opts.peek && !G.peekedThisTurn;
   a.innerHTML = `
     <button class="btn" type="button" data-act="recall" ${S.pend.size ? '' : 'disabled'}>Recall</button>
@@ -1004,22 +1431,22 @@ function renderClocks() {
   const p = cur();
   let shot = '';
   if (G.opts.turnSec && !G.over) shot = `<span class="shot${G.turnLeft <= 10 ? ' low' : ''}" aria-label="Turn time left">${fmt(G.turnLeft)}</span>`;
-  const label = G.over ? `<span class="pill">Game over</span>` : `<span class="pill">${esc(p.name)}'s turn</span>`;
-  const pause = !G.over && G.phase === 'turn' ? `<button class="btn small" type="button" data-act="pause" aria-label="Pause game">❚❚ Pause</button>` : '';
+  const label = G.over ? `<span class="pill">Game over</span>` : G.online ? `<span class="pill">Race on · room ${esc(G.room)}</span>` : `<span class="pill">${esc(p.name)}'s turn</span>`;
+  const pause = !G.over && G.phase === 'turn' && !G.online ? `<button class="btn small" type="button" data-act="pause" aria-label="Pause game">❚❚ Pause</button>` : '';
   const html = label + shot + pause;
   if (tl.innerHTML !== html) tl.innerHTML = html;
   $('#gameClockLine').hidden = !G.opts.gameMin;
   if (G.opts.gameMin) { $('#gameClock').textContent = fmt(G.gameLeft); $('#gameClock').classList.toggle('low', G.gameLeft <= 60); }
 }
 function renderSide() {
-  $('#scores').innerHTML = G.players.map((p, k) => `<div class="score${k === G.cur && !G.over ? ' now' : ''}">
+  $('#scores').innerHTML = G.players.map((p, k) => `<div class="score${k === G.cur && !G.over ? ' now' : ''}${p.off ? ' off' : ''}">
     <span class="dot" style="background:${SEATS[k]}"></span>
-    <span class="nm"><strong>${esc(p.name)}</strong><span>${p.right} right · ${p.wrong} wrong${p.streak >= 2 ? ` · 🔥 ${p.streak}` : ''}</span></span>
+    <span class="nm"><strong>${esc(p.name)}${G.online && k === G.cur ? ' (you)' : ''}</strong><span>${p.right} right · ${p.wrong} wrong${p.streak >= 2 ? ` · 🔥 ${p.streak}` : ''}${G.online && !G.over ? ` · ${p.off ? 'offline' : (p.held ?? p.rack.length) + ' tiles'}` : ''}</span></span>
     <span class="pts">${p.score}</span></div>`).join('');
   const total = totalTiles(), found = total - hiddenCount();
   $('#foundN').textContent = `${found} / ${total}`;
   $('#foundBar').style.width = (found / total * 100) + '%';
-  $('#bagN').textContent = G.bag.length;
+  $('#bagN').textContent = bagCount();
   $('#codeTag').textContent = G.code;
   // Tracker: letters still face down that the current player isn't holding.
   const cnt = {};
@@ -1029,7 +1456,7 @@ function renderSide() {
   $('#log').innerHTML = G.log.slice().reverse().map(x => `<li><span class="dot" style="background:${x.who >= 0 ? SEATS[x.who] : 'var(--muted)'}"></span>
     <span class="what">${x.who >= 0 ? esc(G.players[x.who].name) + ': ' : ''}${x.text}</span>
     <span class="n${x.n < 0 ? ' neg' : ''}">${x.n == null ? '' : (x.n > 0 ? '+' : '') + x.n}</span></li>`).join('');
-  $('#whoBar').innerHTML = `<span class="chip">Board <code>${esc(G.code)}</code></span>`;
+  $('#whoBar').innerHTML = (G.online ? `<span class="chip">Room <code>${esc(G.room)}</code></span> ` : '') + `<span class="chip">Board <code>${esc(G.code)}</code></span>`;
 }
 function render() {
   if (!G) return;
@@ -1049,8 +1476,10 @@ $('#startBtn').addEventListener('click', () => {
   startGame(code);
 });
 $('#resumeBtn').addEventListener('click', () => {
+  if (NET && G && G.online && !G.over) { show('game'); return; }
   const saved = store.get('rtt-game'); if (!saved || saved.sol?.length !== SIZE) return;
   G = saved; resetTurnUI();
+  if (G.online) { reopenRoom(); return; }
   if (G.phase === 'turn') G.paused = true; // coming back mid-turn: start paused so no clock runs before you're ready
   show('game');
   if (G.phase === 'result' || G.phase === 'between') { afterTurn(); return; }
@@ -1060,6 +1489,8 @@ $('#resumeBtn').addEventListener('click', () => {
 window.addEventListener('pagehide', save);
 const qs = new URLSearchParams(location.search).get('board');
 if (qs && parseCode(qs)) { prefs.board = 'code'; $('#codeIn').value = qs.toUpperCase(); }
+const qr = new URLSearchParams(location.search).get('room');
+if (qr && /^[A-Z]{4}$/i.test(qr)) $('#roomIn').value = qr.toUpperCase();
 show('setup');
 </script>
 </body>
