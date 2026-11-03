@@ -510,7 +510,7 @@ body.view-focus .tile.down .pm { display: none; }
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
@@ -1004,12 +1004,26 @@ function loadPeer() {
   });
 }
 // ?peer=host:port points at your own PeerJS server instead of the public one (used for testing).
+// Relay (TURN) servers from config.js are added to the public ones. A relay is what lets two devices on
+// different networks (home wifi and mobile data, say) connect when their routers block a direct link.
+function iceServers() {
+  const extra = (Array.isArray(CFG.online?.turn) ? CFG.online.turn : []).filter(s => s && s.urls);
+  return [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+    // PeerJS's own free relay is the fallback when no relay of our own is set up.
+    ...(extra.length ? extra : [{ urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' }]),
+  ];
+}
 function peerOpts() {
   const q = new URLSearchParams(location.search).get('peer');
-  if (!q) return { debug: 0 };
+  const base = { debug: 0, config: { iceServers: iceServers() } };
+  if (!q) return base;
   const [host, port] = q.split(':');
-  return { host, port: +port || 9000, path: '/', secure: location.protocol === 'https:', debug: 0 };
+  return { ...base, host, port: +port || 9000, path: '/', secure: location.protocol === 'https:' };
 }
+const hasRelay = () => Array.isArray(CFG.online?.turn) && CFG.online.turn.some(s => s && s.urls);
+const NO_LINK = 'Found the room, but can\'t connect to the host\'s device. Your two networks are blocking a direct link'
+  + (hasRelay() ? '. Try again, or try both on the same wifi.' : ', and the game has no relay server set up yet. Both on the same wifi will work.');
 const newRoomCode = () => Array.from({ length: 4 }, () => ROOM_LETTERS[rand(ROOM_LETTERS.length)]).join('');
 const send = (conn, msg) => { try { if (conn?.open) conn.send(msg); } catch {} };
 
@@ -1224,8 +1238,12 @@ $('#joinBtn').addEventListener('click', async () => {
 function guestConnect(net) {
   const c = net.peer.connect(ROOM_PREFIX + net.room, { reliable: true });
   net.conn = c;
-  c.on('open', () => { if (NET !== net) return; net.tries = 0; send(c, { t: 'hello', cid: myCid, name: myName() }); });
+  c.on('open', () => { if (NET !== net) return; clearTimeout(slow); net.tries = 0; send(c, { t: 'hello', cid: myCid, name: myName() }); });
   c.on('data', d => { if (NET === net && net.conn === c) guestRecv(d); });
+  // The room exists but the link never opens: say why instead of 'Connecting…' forever.
+  const stuck = () => { if (NET === net && net.conn === c && !c.open && !G) showRoom(NO_LINK); };
+  const slow = setTimeout(stuck, 15000);
+  c.on('iceStateChanged', s => { if (s === 'failed') stuck(); });
   c.on('close', () => { if (NET === net && net.conn === c && !net.leaving) guestRetry(net); });
 }
 function guestRetry(net) {

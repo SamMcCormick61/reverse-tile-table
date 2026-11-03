@@ -54,6 +54,22 @@ window.RTT_CONFIG = {
     gameMinutes: [0, 10, 20, 30, 45],     // game clock choices (0 = off)
   },
 
+  online: {
+    // Relay (TURN) servers. Without one, players on different networks (home wifi and mobile data, say)
+    // often can't connect. Paste the servers your relay provider gives you, for example:
+    //   turn: [
+    //     { urls: 'turn:global.relay.metered.ca:80', username: 'abc123', credential: 'xyz789' },
+    //     { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'abc123', credential: 'xyz789' },
+    //   ],
+    // Metered free plan (500 MB a month), set up 3 November 2026. Manage it at dashboard.metered.ca.
+    turn: [
+      { urls: 'turn:global.relay.metered.ca:80', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+      { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+      { urls: 'turn:global.relay.metered.ca:443', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+      { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '6b9e7a3a3927a78bb182111c', credential: 'DBx1g++4hboZdPCM' },
+    ],
+  },
+
   board: {
     // Which view the Focus button starts on, the first time the game is opened on a device:
     //   'standard' - plain dark-grey empty squares, with a 2L/3L/2W/3W badge on tiles that sit on a bonus square
