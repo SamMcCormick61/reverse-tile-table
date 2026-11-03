@@ -28,6 +28,8 @@ A crossword tile game played backwards. A full game has already been played to t
 - Tiles played as **blanks** in the finished game start face up as free clues.
 - **Still face down** tracker: counts of every letter still hidden that isn't on your rack.
 
+- **Focus**: the Focus button under the board (or the F key) fades the bonus squares, their labels and the side panels, so only the letters and the tile backs stand out. Your device remembers whether it's on.
+
 ### Boards
 
 - **Fresh deal**: a brand-new finished game.
@@ -42,7 +44,8 @@ This game's board, bag and values are its own:
 - The board is **16 × 16**. There's no single middle square, so the first word of the finished game covers one of the four ◆ diamond start squares in the middle.
 - Bonus squares are labelled **2L / 3L** (letter ×2 / ×3) and **2W / 3W** (word ×2 / ×3), in this game's own layout.
 - The bag holds **112 tiles** (including 2 blanks).
-- Face-up tiles are sea-glass green.
+- Face-up tiles are sea-glass green, on a slate-grey board.
+- Bonus colours: **3W** deep purple, **2W** lilac, **3L** emerald, **2L** lime.
 - Letter values: A E I N O R S T 1 · D L U 2 · C G H M P Y 3 · B F V W 5 · K 6 · X 8 · J Q Z 9. No letter is worth 4 or 10.
 
 Play solo, or pass one device around for 2 to 4 players. Your game is saved in the browser, so a reload picks up where you left off.
@@ -60,6 +63,18 @@ Each player uses their own phone or computer, and there are **no turns**: everyo
 
 How it works: devices connect directly to each other over WebRTC using [PeerJS](https://peerjs.com/) (`peerjs.min.js`, MIT licence). The free public PeerJS server only introduces the devices. The host's device is the referee: it holds the bag and racks, scores each Check in the order they arrive, and sends everyone the result. A few networks (some mobile carriers and office firewalls) block direct connections. Fixing that needs a relay (TURN) server. For testing, `?peer=127.0.0.1:9000` points the game at your own PeerJS server.
 
+## Changing colours and settings
+
+Open `config.js`, change a value, save, and reload the game. You can change:
+
+- **colors**: the table, the board, every bonus square and its label, face-up tiles and tile backs. Any CSS colour works (`'#3a7bd5'`, `'teal'`).
+- **letterValues**: points for any letter, e.g. `{ Q: 8 }`. The board generator keeps the built-in values, so board codes still make the same boards.
+- **scoring**: clean sweep bonus, peek cost, hot streak step.
+- **timers**: the turn timer and game clock choices on the setup screen, and the default turn time.
+- **focus**: how faint the bonus squares and side panels go in Focus mode.
+
+Delete a line, or the whole file, to go back to the default. For online games every player's copy should use the same `letterValues` and `scoring`. The Android app bundles `config.js` when it's built, so rebuild the app after changing it.
+
 ## Android app
 
 The game is also packaged as an Android app for Google Play. [ANDROID.md](ANDROID.md) has every step, from trying it on your phone to publishing.
@@ -72,6 +87,7 @@ The game is also packaged as an Android app for Google Play. [ANDROID.md](ANDROI
 
 - `index.html` - the whole game (rules, scoring, board, timers)
 - `peerjs.min.js` - PeerJS 1.5.5, loaded only when you play online
+- `config.js` - colours and other settings you can change
 - `gen.js` - finished-board generator (also runs under Node for testing)
 - `gen-worker.js` - runs the generator off the main thread
 - `common.txt` - everyday words: common English words that are also in ENABLE, plus all two-letter words

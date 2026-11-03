@@ -5,7 +5,7 @@ const root = path.join(__dirname, '..'), out = path.join(root, 'www');
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });
-for (const f of ['gen.js', 'gen-worker.js', 'peerjs.min.js', 'common.txt', 'words.txt', 'privacy.html']) fs.copyFileSync(path.join(root, f), path.join(out, f));
+for (const f of ['config.js', 'gen.js', 'gen-worker.js', 'peerjs.min.js', 'common.txt', 'words.txt', 'privacy.html']) fs.copyFileSync(path.join(root, f), path.join(out, f));
 
 const fonts = [
   ['Bricolage Grotesque', 'bricolage-grotesque', [600, 800]],
