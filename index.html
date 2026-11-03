@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Reverse Tile Table</title>
 <meta name="description" content="A finished crossword tile game with every tile face down. Work out where your letters went.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='5' fill='%23b88a52'/%3E%3Ctext x='15' y='23' font-family='sans-serif' font-weight='700' font-size='19' text-anchor='middle' fill='%232b1c10'%3E%3F%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='5' fill='%2380bfa9'/%3E%3Ctext x='15' y='23' font-family='sans-serif' font-weight='700' font-size='19' text-anchor='middle' fill='%2310302a'%3E%3F%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Jost:wght@500;600&display=swap">
@@ -17,7 +17,7 @@
   --frame: #163a35; --frame-edge: #0f2a26; --cell: #c9ccb0; --cell-ink: #5d6450;
   --tw: #c4473a; --dw: #e6a6a2; --tl: #2f5d9e; --dl: #98c7de;
   --tw-ink: #fff3ee; --dw-ink: #6a2b28; --tl-ink: #eaf1ff; --dl-ink: #1d4257;
-  --tile-1: #f7e9c8; --tile-2: #e2c690; --tile-ink: #2b1c10; --tile-edge: #a9844d; --blank-ink: #a4581c;
+  --tile-1: #dff3ea; --tile-2: #a7d5c3; --tile-ink: #10302a; --tile-edge: #4f8a76; --blank-ink: #b4502a; /* sea-glass tiles, not the classic beige */
   --back-1: #9a6b3e; --back-2: #6e4627; --back-edge: #4a2d17; --back-ink: rgba(255,236,205,.55);
   --ledge-1: #6a4429; --ledge-2: #3e2717;
   --accent: #f2b84b; --accent-ink: #2b1c10; --good: #7bd69a; --bad: #ff8f7d;
@@ -125,7 +125,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .zoom-ctl { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; }
 .zoom-ctl .btn { min-width: 40px; padding: 0 10px; font-size: 18px; }
 .zoom-ctl output { min-width: 46px; text-align: center; font: 600 13px var(--f-body); color: var(--muted); font-variant-numeric: tabular-nums; }
-.board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: .4cqw; padding: 1.8cqw; border-radius: 2cqw;
+.board { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: .4cqw; padding: 1.8cqw; border-radius: 2cqw;
   background: linear-gradient(160deg, var(--frame), var(--frame-edge)); box-shadow: 0 2.2cqw 4cqw var(--shadow), inset 0 0 0 .3cqw rgba(255,255,255,.06); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .cell { aspect-ratio: 1; border-radius: .6cqw; background: var(--cell); position: relative; display: grid; place-items: center;
   font: 700 1.7cqw/1 var(--f-body); letter-spacing: .04em; color: var(--cell-ink); box-shadow: inset 0 .25cqw .4cqw rgba(0,0,0,.18); }
@@ -146,7 +146,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .tile b { font-weight: 600; transform: translateY(-4%); }
 .tile i { position: absolute; right: 9%; bottom: 7%; font: 600 1.5cqw/1 var(--f-tile); font-style: normal; }
 .tile.blank b { color: var(--blank-ink); }
-.tile.clue { background: linear-gradient(150deg, #efe2c4 10%, #d6c091); }
+.tile.clue { background: linear-gradient(150deg, #d3e6de 10%, #98c2b2); }
 .tile.clue::after { content: ""; position: absolute; left: 10%; top: 10%; width: 1cqw; height: 1cqw; border-radius: 50%; background: var(--seat-1); }
 .tile.down { background: repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 .5cqw, transparent .5cqw 1.2cqw), linear-gradient(150deg, var(--back-1) 10%, var(--back-2));
   box-shadow: inset 0 -.45cqw 0 var(--back-edge), inset 0 .2cqw 0 rgba(255,255,255,.18), 0 .35cqw .55cqw var(--shadow); color: var(--back-ink); }
@@ -318,7 +318,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
     <div class="loading">
       <div class="deal" aria-hidden="true"><span class="mini down">?</span><span class="mini down">?</span><span class="mini down">?</span><span class="mini down">?</span><span class="mini down">?</span></div>
       <h1 style="font-size:28px">Playing out a full game…</h1>
-      <p class="muted" id="loadingMsg" style="margin:0">Two computer players are using every one of the 100 tiles. This takes a few seconds.</p>
+      <p class="muted" id="loadingMsg" style="margin:0">Two computer players are using every one of the 112 tiles. This takes a few seconds.</p>
     </div>
   </section>
 
@@ -364,10 +364,10 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
         </div>
         <div class="card">
           <div class="legend">
-            <span><i style="background:var(--tw)"></i>Triple word</span>
-            <span><i style="background:var(--dw)"></i>Double word</span>
-            <span><i style="background:var(--tl)"></i>Triple letter</span>
-            <span><i style="background:var(--dl)"></i>Double letter</span>
+            <span><i style="background:var(--tw)"></i>3W · word ×3</span>
+            <span><i style="background:var(--dw)"></i>2W · word ×2</span>
+            <span><i style="background:var(--tl)"></i>3L · letter ×3</span>
+            <span><i style="background:var(--dl)"></i>2L · letter ×2</span>
           </div>
         </div>
         <button class="btn warn small" id="quitBtn" type="button">End game</button>
@@ -420,24 +420,26 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
 
 // ---------- Rules data ----------
 const VALUES = RSGen.VALUES;
-const N = 15, CENTER = 112, RACK = 7;
-const PREM = new Array(225).fill('');
+const N = RSGen.N, SIZE = RSGen.SIZE, START = RSGen.START, RACK = 7;
+const PREM = new Array(SIZE).fill('');
 function mark(type, base) {
   for (const [r, c] of base) for (const [a, b] of [[r, c], [c, r]])
-    for (const rr of [a, 14 - a]) for (const cc of [b, 14 - b]) PREM[rr * N + cc] = type;
+    for (const rr of [a, N - 1 - a]) for (const cc of [b, N - 1 - b]) PREM[rr * N + cc] = type;
 }
-// This game's own bonus layout (deliberately not the classic board). The center star carries no bonus.
-mark('TW', [[0,4]]);
-mark('DW', [[1,1],[3,6],[5,7]]);
-mark('TL', [[0,0],[4,4],[6,6]]);
-mark('DL', [[0,7],[1,3],[2,7],[3,5],[5,5]]);
+// This game's own 16 x 16 bonus layout (deliberately not the classic board). The four middle start squares carry no bonus.
+mark('TW', [[0,3]]);
+mark('DW', [[1,1],[2,5],[4,6]]);
+mark('TL', [[0,0],[3,3],[6,6]]);
+mark('DL', [[0,7],[1,4],[2,7],[4,4],[5,7]]);
+// How each bonus square is labelled on the board.
+const PLABEL = { TW: '3W', DW: '2W', TL: '3L', DL: '2L' };
 const SEATS = ['var(--seat-0)','var(--seat-1)','var(--seat-2)','var(--seat-3)'];
 const SWEEP = 50, PEEK_COST = 10, STREAK_STEP = 10;
 const TURN_OPTS = [[0, 'Off'], [30, '30 s'], [60, '1 min'], [90, '90 s'], [120, '2 min']];
@@ -462,6 +464,7 @@ const RULES = [
   `Turn the last face-down tile of a word and you also score the <b>whole word</b>, with double and triple word squares you covered that turn.`,
   `All seven right in one turn is a <b>clean sweep</b>: +${SWEEP}. With hot streaks on, each perfect turn after another earns +${STREAK_STEP}, +${STREAK_STEP * 2}, and so on.`,
   `Tiles played as blanks in the finished game start face up as free clues. With <b>Show first letters</b> on, so does the first letter of every word.`,
+  `<b>Swapping</b> puts tiles back in the bag and draws new ones, but costs the value of every tile you swap and ends your turn.`,
   `The game ends when the board is fully face up, the game clock runs out, or everyone passes twice in a row. Tiles left on your rack then count against you.`,
 ];
 $('#rulesList').innerHTML = RULES.map(r => `<li>${r}</li>`).join('');
@@ -486,7 +489,7 @@ function renderSetup() {
     : prefs.board === 'code' ? 'Type the code from a game a friend played to get the exact same board.'
     : 'A brand-new finished game is played out for you.';
   const saved = store.get('rtt-game');
-  $('#resumeBtn').hidden = !(saved && !saved.over && saved.sol);
+  $('#resumeBtn').hidden = !(saved && !saved.over && saved.sol?.length === SIZE);
 }
 function dailyCode() { const d = new Date(); return prefs.words + String((d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()) % 1000000).padStart(6, '0'); }
 $('#setupView').addEventListener('input', e => { const k = e.target.dataset.pl; if (k != null) { prefs.players[+k] = e.target.value; savePrefs(); } });
@@ -559,17 +562,17 @@ async function startGame(code, again) {
   const sol = gen.board.map(x => x ? { ch: x.ch, blank: !!x.blank, turn: x.turn } : null);
   const names = prefs.players.map((n, k) => (n || '').trim() || 'Player ' + (k + 1));
   G = {
-    v: APP_VERSION, code: p.mode + p.seed, sol, rev: new Array(225).fill(0), notes: {}, bag: [],
+    v: APP_VERSION, code: p.mode + p.seed, sol, rev: new Array(SIZE).fill(0), notes: {}, bag: [],
     players: names.map(name => ({ name, score: 0, rack: [], streak: 0, right: 0, wrong: 0, words: 0, peeks: 0 })),
     cur: 0, turn: 1, passes: 0, log: [], over: false, endReason: '',
     opts: { turnSec: prefs.turnSec, gameMin: prefs.gameMin, opener: prefs.opener, firsts: prefs.firsts, notes: prefs.notes, peek: prefs.peek, streak: prefs.streak },
     gameLeft: prefs.gameMin * 60, turnLeft: prefs.turnSec, phase: 'pass', peekedThisTurn: false, firstWord: gen.words[0]?.cells || [],
   };
   // Blank tiles from the finished game are free clues; so is the opening word if that helper is on.
-  for (let i = 0; i < 225; i++) if (sol[i]?.blank) G.rev[i] = 2;
+  for (let i = 0; i < SIZE; i++) if (sol[i]?.blank) G.rev[i] = 2;
   if (G.opts.opener) for (const i of G.firstWord) G.rev[i] = G.rev[i] || 2;
   if (G.opts.firsts) for (const run of allRuns(sol)) G.rev[run[0]] = G.rev[run[0]] || 2;
-  for (let i = 0; i < 225; i++) if (sol[i] && !G.rev[i]) G.bag.push(sol[i].ch);
+  for (let i = 0; i < SIZE; i++) if (sol[i] && !G.rev[i]) G.bag.push(sol[i].ch);
   shuffle(G.bag);
   for (const pl of G.players) refill(pl);
   G.log.push({ who: -1, text: `Board <b>${esc(G.code)}</b> dealt: ${gen.words.length} words, ${gen.placed} tiles.` });
@@ -580,7 +583,7 @@ async function startGame(code, again) {
 
 let nextTileId = 1;
 function refill(pl) { while (pl.rack.length < RACK && G.bag.length) pl.rack.push({ id: 't' + Date.now().toString(36) + (nextTileId++), ch: G.bag.pop() }); }
-function hiddenCount() { let n = 0; for (let i = 0; i < 225; i++) if (G.sol[i] && !G.rev[i]) n++; return n; }
+function hiddenCount() { let n = 0; for (let i = 0; i < SIZE; i++) if (G.sol[i] && !G.rev[i]) n++; return n; }
 function totalTiles() { return G.sol.filter(Boolean).length; }
 
 function resetTurnUI() { S.selected = null; S.pend = new Map(); S.swapMode = false; S.swapSel = new Set(); S.peekMode = false; }
@@ -693,7 +696,10 @@ function doSwap() {
   refill(p);
   for (const t of back) G.bag.push(t.ch);
   shuffle(G.bag); p.streak = 0; G.passes = 0;
-  G.log.push({ who: G.cur, text: `Swapped ${back.length} tile${back.length > 1 ? 's' : ''}` });
+  // Swapping costs the face value of every tile put back.
+  const cost = back.reduce((n, t) => n + VALUES[t.ch], 0);
+  p.score -= cost;
+  G.log.push({ who: G.cur, text: `Swapped ${back.map(t => '<b>' + t.ch + '</b>').join(' ')}`, n: -cost });
   resetTurnUI(); G.phase = 'between'; save();
   afterTurn();
 }
@@ -919,10 +925,10 @@ function rtileHTML(ch, cls, attrs) {
 function renderBoard() {
   const targeting = G.phase === 'turn' && (S.selected || S.peekMode);
   let html = '';
-  for (let i = 0; i < 225; i++) {
+  for (let i = 0; i < SIZE; i++) {
     const prem = PREM[i], s = G.sol[i], p = S.pend.get(i);
     let inner = '', cls = 'cell' + (prem ? ' ' + prem : '');
-    if (!s) { cls += ' void'; inner = i === CENTER ? '★' : prem; if (i === CENTER) cls += ' star'; }
+    if (!s) { cls += ' void'; inner = START.includes(i) ? '★' : PLABEL[prem] || ''; if (START.includes(i)) cls += ' star'; }
     else if (G.rev[i]) {
       const fresh = S.fresh.has(i) ? ' fresh' : '';
       if (s.blank) inner = `<span class="tile blank clue${fresh}"><b>${s.ch}</b></span>`;
@@ -933,7 +939,7 @@ function renderBoard() {
     else if (p) inner = tileHTML(p.ch, ' pending', `data-tile-id="${p.id}" data-src="board" role="button" tabindex="0" aria-label="Pick up ${p.ch}"`);
     else {
       const nots = G.opts.notes && G.notes[i] ? `<span class="nots" aria-label="Not ${G.notes[i].split('').join(', ')}">${G.notes[i]}</span>` : '';
-      inner = `<span class="tile down">${prem ? `<span class="pm ${prem}">${prem}</span>` : ''}${nots}</span>`;
+      inner = `<span class="tile down">${prem ? `<span class="pm ${prem}">${PLABEL[prem]}</span>` : ''}${nots}</span>`;
       if (targeting) cls += ' target';
     }
     html += `<div class="${cls}" data-cell="${i}">${inner}</div>`;
@@ -952,7 +958,7 @@ function renderRack() {
 
   const pv = $('#preview');
   if (G.over) pv.innerHTML = '';
-  else if (S.swapMode) pv.innerHTML = `<span class="muted">Tap the tiles to put back in the bag (${S.swapSel.size} chosen). Swapping ends your turn.</span>`;
+  else if (S.swapMode) pv.innerHTML = `<span class="muted">Tap the tiles to put back in the bag (${S.swapSel.size} chosen, costs ${[...S.swapSel].reduce((n, id) => n + (VALUES[rackTile(id)?.ch] || 0), 0)} points). Swapping ends your turn.</span>`;
   else if (S.peekMode) pv.innerHTML = `<span class="muted">Tap any face-down tile to flip it for ${PEEK_COST} points.</span>`;
   else if (S.pend.size) {
     let pot = 0; for (const [i, t] of S.pend) pot += VALUES[t.ch] * letterMult(i);
@@ -1016,7 +1022,7 @@ function renderSide() {
   $('#codeTag').textContent = G.code;
   // Tracker: letters still face down that the current player isn't holding.
   const cnt = {};
-  for (let i = 0; i < 225; i++) if (G.sol[i] && !G.rev[i]) cnt[G.sol[i].ch] = (cnt[G.sol[i].ch] || 0) + 1;
+  for (let i = 0; i < SIZE; i++) if (G.sol[i] && !G.rev[i]) cnt[G.sol[i].ch] = (cnt[G.sol[i].ch] || 0) + 1;
   if (G.phase === 'turn') for (const t of cur().rack) cnt[t.ch]--;
   $('#tracker').innerHTML = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(L => `<span class="${cnt[L] > 0 ? '' : 'gone'}">${L}<em>${Math.max(0, cnt[L] || 0)}</em></span>`).join('');
   $('#log').innerHTML = G.log.slice().reverse().map(x => `<li><span class="dot" style="background:${x.who >= 0 ? SEATS[x.who] : 'var(--muted)'}"></span>
@@ -1042,7 +1048,7 @@ $('#startBtn').addEventListener('click', () => {
   startGame(code);
 });
 $('#resumeBtn').addEventListener('click', () => {
-  const saved = store.get('rtt-game'); if (!saved) return;
+  const saved = store.get('rtt-game'); if (!saved || saved.sol?.length !== SIZE) return;
   G = saved; resetTurnUI();
   if (G.phase === 'turn') G.paused = true; // coming back mid-turn: start paused so no clock runs before you're ready
   show('game');
