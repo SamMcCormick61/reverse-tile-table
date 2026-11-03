@@ -44,6 +44,7 @@ window.RTT_CONFIG = {
   scoring: {
     cleanSweep: 50,             // bonus for getting all seven tiles right in one turn
     peekCost: 10,               // points a peek costs
+    revealTokens: 3,            // secret reveals each player gets (0 turns them off)
     streakStep: 10,             // hot streak bonus grows by this much each perfect turn
   },
 
