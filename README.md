@@ -39,7 +39,7 @@ A crossword tile game played backwards. A full game has already been played to t
 
 This game's board, bag and values are its own:
 
-- The board is **16 × 16**. There's no single middle square, so the first word of the finished game covers one of the four ★ start squares in the middle.
+- The board is **16 × 16**. There's no single middle square, so the first word of the finished game covers one of the four ◆ diamond start squares in the middle.
 - Bonus squares are labelled **2L / 3L** (letter ×2 / ×3) and **2W / 3W** (word ×2 / ×3), in this game's own layout.
 - The bag holds **112 tiles** (including 2 blanks).
 - Face-up tiles are sea-glass green.

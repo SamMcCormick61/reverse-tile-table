@@ -135,7 +135,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .cell.TL { background: var(--tl); color: var(--tl-ink); }
 .cell.DL { background: var(--dl); color: var(--dl-ink); }
 .cell.void { opacity: .6; }
-.cell.star { font-size: 3.6cqw; }
+.cell.start { font-size: 3.4cqw; }
 .cell.hover { outline: .4cqw solid var(--accent); outline-offset: -.2cqw; }
 .cell.target { cursor: pointer; }
 .cell.target:hover { filter: brightness(1.12); }
@@ -421,7 +421,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 <script src="gen.js"></script>
 <script>
 // Bump APP_VERSION and version.txt together on every release.
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 $('#verTag').textContent = $('#footVer').textContent = 'v' + APP_VERSION;
@@ -929,7 +929,7 @@ function renderBoard() {
   for (let i = 0; i < SIZE; i++) {
     const prem = PREM[i], s = G.sol[i], p = S.pend.get(i);
     let inner = '', cls = 'cell' + (prem ? ' ' + prem : '');
-    if (!s) { cls += ' void'; inner = START.includes(i) ? '★' : PLABEL[prem] || ''; if (START.includes(i)) cls += ' star'; }
+    if (!s) { cls += ' void'; inner = START.includes(i) ? '◆' : PLABEL[prem] || ''; if (START.includes(i)) cls += ' start'; }
     else if (G.rev[i]) {
       const fresh = S.fresh.has(i) ? ' fresh' : '';
       if (s.blank) inner = `<span class="tile blank clue${fresh}"><b>${s.ch}</b></span>`;
