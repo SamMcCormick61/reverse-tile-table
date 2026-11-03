@@ -6,7 +6,7 @@ A crossword tile game played backwards. A full game has already been played to t
 
 ## How it plays
 
-- The board shows the shape of the finished game on plain dark-grey squares, and each tile is face down. The bonus squares are hidden but still count, so a tile can score more than you expect.
+- The board shows the shape of the finished game on plain dark-grey squares, and each tile is face down. A tile on a bonus square carries a small 2L, 3L, 2W or 3W badge.
 - On your turn, drop any number of your seven tiles onto face-down squares, anywhere, and press **Check**.
 - **Right** tiles flip face up and score their letter value (doubled on **2L** squares, tripled on **3L**). Your letter points are **multiplied by the number of tiles you got right** that turn.
 - **Wrong** tiles cost their letter value (at least 1) and go back in the bag.
@@ -29,6 +29,8 @@ A crossword tile game played backwards. A full game has already been played to t
 - **Still face down** tracker: counts of every letter still hidden that isn't on your rack.
 
 
+- **Focus**: the button under the board (or the F key) switches the board view. **Off** shows the badges on tiles; **on** hides them too, so only letters and tile backs show; **show bonuses** colours and labels every bonus square as a map. Your device remembers the view.
+
 ### Boards
 
 - **Fresh deal**: a brand-new finished game.
@@ -41,10 +43,10 @@ A crossword tile game played backwards. A full game has already been played to t
 This game's board, bag and values are its own:
 
 - The board is **16 × 16**. There's no single middle square, so the first word of the finished game covers one of the four ◆ diamond start squares in the middle.
-- Hidden bonus squares, in this game's own layout: **2L / 3L** (letter ×2 / ×3) and **2W / 3W** (word ×2 / ×3).
+- Bonus squares, in this game's own layout: **2L / 3L** (letter ×2 / ×3) and **2W / 3W** (word ×2 / ×3).
 - The bag holds **112 tiles** (including 2 blanks).
 - Face-up tiles are sea-glass green, on a slate-grey board.
-- If you switch them on in `config.js`, the bonus colours are **3W** deep purple, **2W** lilac, **3L** emerald and **2L** lime.
+- Bonus colours: **3W** deep purple, **2W** lilac, **3L** emerald, **2L** lime.
 - Letter values: A E I N O R S T 1 · D L U 2 · C G H M P Y 3 · B F V W 5 · K 6 · X 8 · J Q Z 9. No letter is worth 4 or 10.
 
 Play solo, or pass one device around for 2 to 4 players. Your game is saved in the browser, so a reload picks up where you left off.
@@ -70,7 +72,7 @@ Open `config.js`, change a value, save, and reload the game. You can change:
 - **letterValues**: points for any letter, e.g. `{ Q: 8 }`. The board generator keeps the built-in values, so board codes still make the same boards.
 - **scoring**: clean sweep bonus, peek cost, hot streak step.
 - **timers**: the turn timer and game clock choices on the setup screen, and the default turn time.
-- **board.showBonusSquares**: `false` (the default) keeps the bonus squares hidden. Set it to `true` to show their colours and labels again.
+- **board.defaultView**: which Focus view a new device starts on (`'standard'`, `'focus'` or `'all'`).
 
 Delete a line, or the whole file, to go back to the default. For online games every player's copy should use the same `letterValues` and `scoring`. The Android app bundles `config.js` when it's built, so rebuild the app after changing it.
 

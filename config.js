@@ -19,7 +19,7 @@ window.RTT_CONFIG = {
     square: '#a9adb3',          // plain squares
     squareText: '#3c4046',
 
-    // Bonus squares (background, then label colour). Only seen when board.showBonusSquares is true.
+    // Bonus squares (background, then label colour), used for the tile badges and the 'all' view
     word3: '#5b3d9a',   word3Text: '#f4eeff',    // 3W
     word2: '#b9a6e6',   word2Text: '#2f1d5c',    // 2W
     letter3: '#1d8a5c', letter3Text: '#eafff4',  // 3L
@@ -54,8 +54,10 @@ window.RTT_CONFIG = {
   },
 
   board: {
-    // The bonus squares (2L, 3L, 2W, 3W) are hidden: empty squares are plain dark grey and tile backs
-    // have no bonus badge. They still score. Set this to true to show them again.
-    showBonusSquares: false,
+    // Which view the Focus button starts on, the first time the game is opened on a device:
+    //   'standard' - plain dark-grey empty squares, with a 2L/3L/2W/3W badge on tiles that sit on a bonus square
+    //   'focus'    - the same, without the badges
+    //   'all'      - every bonus square coloured and labelled, as a map of the board
+    defaultView: 'standard',
   },
 };

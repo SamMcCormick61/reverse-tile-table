@@ -140,15 +140,15 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: u
 .cell.hover { outline: .4cqw solid var(--accent); outline-offset: -.2cqw; }
 .cell.target { cursor: pointer; }
 .cell.target:hover { filter: brightness(1.12); }
-/* Plain board: bonus squares are hidden, so empty squares are plain dark grey and tile backs carry no bonus badge.
-   They still score. Set board.showBonusSquares: true in config.js to show them again. */
-body:not(.show-bonus) .cell:is(.TW,.DW,.TL,.DL) { background: var(--cell); color: transparent; }
-body:not(.show-bonus) .cell.void { opacity: .35; }
-body:not(.show-bonus) .tile.down .pm { display: none; }
-body:not(.show-bonus) .board { background: var(--frame-edge); }
-body:not(.show-bonus) .legend { display: none; }
-.hidden-bonus { font-size: 12px; color: var(--muted); margin: 0; }
-body.show-bonus .hidden-bonus { display: none; }
+/* Board views, picked with the View button (body.view-*):
+   standard - empty squares plain dark grey; face-down tiles show their 2L/3L/2W/3W badge
+   focus    - as standard, but the badges on tiles are hidden too
+   all      - every bonus square is coloured and labelled, as a reference map */
+body:not(.view-all) .cell:is(.TW,.DW,.TL,.DL) { background: var(--cell); color: transparent; }
+body:not(.view-all) .cell.void { opacity: .35; }
+body:not(.view-all) .board { background: var(--frame-edge); }
+body.view-focus .tile.down .pm { display: none; }
+.zoom-ctl .view-btn { margin-right: auto; min-width: 0; font-size: 13px; }
 
 .tile { position: absolute; inset: 4%; border-radius: 14%; display: grid; place-items: center;
   background: linear-gradient(150deg, var(--tile-1) 10%, var(--tile-2));
@@ -367,6 +367,7 @@ body.show-bonus .hidden-bonus { display: none; }
         <div class="board-wrap">
           <div class="board-view" id="boardView"><div class="board-inner" id="boardInner"><div class="board" id="board"></div></div></div>
           <div class="zoom-ctl" role="group" aria-label="Board view">
+            <button class="btn small view-btn" id="viewBtn" type="button" title="Switch board view (F)"></button>
             <button class="btn small" id="zoomOut" type="button" aria-label="Zoom out" disabled>−</button>
             <output id="zoomPct">100%</output>
             <button class="btn small" id="zoomIn" type="button" aria-label="Zoom in">+</button>
@@ -406,7 +407,6 @@ body.show-bonus .hidden-bonus { display: none; }
             <span><i style="background:var(--tl)"></i>3L · letter ×3</span>
             <span><i style="background:var(--dl)"></i>2L · letter ×2</span>
           </div>
-          <p class="hidden-bonus">Bonus squares are hidden. They still double or triple letters and words, so a tile can score more than you expect.</p>
         </div>
         <button class="btn warn small" id="quitBtn" type="button">End game</button>
       </aside>
@@ -489,7 +489,6 @@ const cfgNum = (v, d, lo = 0) => Number.isFinite(+v) && v !== '' && v !== null &
     tileText: '--tile-ink', tileEdge: '--tile-edge', tileBack: '--back-1', tileBackShade: '--back-2', tileBackEdge: '--back-edge' };
   const root = document.documentElement.style;
   for (const [k, v] of Object.entries(CFG.colors || {})) if (map[k] && typeof v === 'string' && CSS.supports('color', v)) root.setProperty(map[k], v);
-  document.body.classList.toggle('show-bonus', CFG.board?.showBonusSquares === true);
 }
 
 // ---------- Rules data ----------
@@ -527,7 +526,7 @@ const store = {
 };
 
 const RULES = [
-  `Every square with a tile on it is a <b>face-down tile</b>. You can see the shape of the finished game, but not the letters.` + (document.body.classList.contains('show-bonus') ? ' The bonus squares are marked.' : ' The bonus squares are hidden, but they still count.'),
+  `Every square with a tile on it is a <b>face-down tile</b>. You can see the shape of the finished game and a badge on each tile that sits on a bonus square, but not the letters. The <b>Focus</b> button under the board switches between that view, a plainer one with no badges, and a map of every bonus square.`,
   `Each turn, put any number of your seven tiles on face-down squares, anywhere on the board. Press <b>Check</b> to flip them.`,
   `A <b>correct</b> tile stays face up and scores its letter value, doubled or tripled on a letter bonus square. Your letter points are then <b>multiplied by how many tiles you got right</b> that turn.`,
   `A <b>wrong</b> tile costs its letter value (at least 1) and goes back in the bag.`,
@@ -880,6 +879,20 @@ function showPause() {
   $('#unpauseBtn').focus();
 }
 $('#unpauseBtn').addEventListener('click', () => setPaused(false));
+
+// Board view: standard (tile badges), focus (no badges), all (every bonus square shown). Remembered on this device.
+const VIEWS = { standard: 'Focus: off', focus: 'Focus: on', all: 'Focus: show bonuses' };
+function setView(v) {
+  if (!VIEWS[v]) v = 'standard';
+  for (const k of Object.keys(VIEWS)) document.body.classList.toggle('view-' + k, k === v);
+  $('#viewBtn').textContent = VIEWS[v];
+  $('#viewBtn').setAttribute('aria-pressed', v !== 'standard');
+  $('#viewBtn').dataset.view = v;
+  store.set('rtt-view', v);
+}
+const nextView = () => { const k = Object.keys(VIEWS); setView(k[(k.indexOf($('#viewBtn').dataset.view) + 1) % k.length]); };
+$('#viewBtn').addEventListener('click', nextView);
+setView(store.get('rtt-view') || CFG.board?.defaultView || 'standard');
 
 $('#turnline').addEventListener('click', e => { if (e.target.closest('[data-act="pause"]')) setPaused(true); });
 
@@ -1366,6 +1379,7 @@ $('#board').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if ((e.key === 'p' || e.key === 'P') && !e.target.closest('input') && G && !G.over && G.phase === 'turn') { setPaused(!G.paused); return; }
   if (G?.paused) return;
+  if ((e.key === 'f' || e.key === 'F') && !e.target.closest('input') && !e.ctrlKey && !e.metaKey) { nextView(); return; }
   if (e.key === 'Escape') { if (S.peekMode || S.swapMode || S.selected) { S.peekMode = false; S.swapMode = false; S.selected = null; render(); } }
   else if (e.key === 'Enter' && G?.phase === 'turn' && S.pend.size && !e.target.closest('button,input')) checkMove();
 });
@@ -1417,7 +1431,7 @@ function renderRack() {
   else if (S.swapMode) pv.innerHTML = `<span class="muted">Tap the tiles to put back in the bag (${S.swapSel.size} chosen, costs ${[...S.swapSel].reduce((n, id) => n + (VALUES[rackTile(id)?.ch] || 0), 0)} points). Swapping ends your turn.</span>`;
   else if (S.peekMode) pv.innerHTML = `<span class="muted">Tap any face-down tile to flip it for ${PEEK_COST} points.</span>`;
   else if (S.pend.size) {
-    let pot = 0; const showBonus = document.body.classList.contains('show-bonus'); for (const [i, t] of S.pend) pot += VALUES[t.ch] * (showBonus ? letterMult(i) : 1);
+    let pot = 0; for (const [i, t] of S.pend) pot += VALUES[t.ch] * letterMult(i);
     pv.innerHTML = `<span class="muted">${S.pend.size} tile${S.pend.size > 1 ? 's' : ''} down. All right would be at least <b style="color:var(--ink)">${pot * S.pend.size}</b>; each wrong one costs its value.</span>`;
   } else if (S.selected) pv.innerHTML = '<span class="muted">Tap a face-down tile to put your letter there, or drag it.</span>';
   else pv.innerHTML = G.phase === 'turn' ? '<span class="muted">Drag or tap your tiles onto face-down squares where you think they were played.</span>' : '';
