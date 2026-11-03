@@ -25,6 +25,8 @@ let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const links = /<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">\n<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>\n<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^"]*">/;
 if (!links.test(html)) throw new Error('index.html font links changed: update scripts/build-web.js');
 html = html.replace(links, '<link rel="stylesheet" href="fonts.css">');
+// The installable-web-app bits (manifest, icons) are for the browser version only.
+html = html.replace(/<link rel="manifest"[^>]*>\n<meta name="theme-color"[^>]*>\n<link rel="apple-touch-icon"[^>]*>\n/, '');
 // The app draws under Android's status and navigation bars; Capacitor reports their size in --safe-area-inset-*.
 html = html.replace('</head>', `<style>
 .wrap { padding-top: calc(14px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
