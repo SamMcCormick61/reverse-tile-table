@@ -51,12 +51,13 @@ jobs:
           UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
           VERSION_NAME: ${{ inputs.versionName }}
         run: |
-          if [ -z "$KEYSTORE_B64" ]; then echo "::error::Add the UPLOAD_KEYSTORE_* secrets first (see ANDROID.md)"; exit 1; fi
+          if [ -z "$KEYSTORE_B64" ]; then echo "::notice::Skipped the Google Play bundle: add the UPLOAD_KEYSTORE_* secrets first (see ANDROID.md)"; exit 0; fi
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           export UPLOAD_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
           ./gradlew bundleRelease -PversionCode=$GITHUB_RUN_NUMBER -PversionName="$VERSION_NAME"
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch'
         with:
+          if-no-files-found: ignore
           name: reverse-tile-table-play-bundle
           path: android/app/build/outputs/bundle/release/*.aab
